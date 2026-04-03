@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=MiniMax Agent
+Comment=MiniMax Agent Desktop Application
+Exec=/usr/bin/minimax-agent %U
+Icon=minimax-agent
+Type=Application
+StartupNotify=true
+Categories=Network;Chat;Utility;
+Keywords=AI;Agent;Assistant;Chat;
+MimeType=x-scheme-handler/minimax;x-scheme-handler/minimax-agent;
+Terminal=false

@@ -1,0 +1,36 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        # Update desktop database
+        if [ -x /usr/bin/update-desktop-database ]; then
+            /usr/bin/update-desktop-database /usr/share/applications/ 2>/dev/null || true
+        fi
+
+        # Update icon cache
+        if [ -x /usr/bin/gtk-update-icon-cache ]; then
+            /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+        fi
+
+        # Set permissions for chrome-sandbox
+        if [ -f /opt/minimax-agent/chrome-sandbox ]; then
+            chmod 4755 /opt/minimax-agent/chrome-sandbox 2>/dev/null || true
+        fi
+
+        # Register protocol handlers for OAuth login
+        # This is needed for the app to receive login callbacks
+        if command -v xdg-mime >/dev/null 2>&1; then
+            xdg-mime default minimax-agent.desktop x-scheme-handler/minimax 2>/dev/null || true
+            xdg-mime default minimax-agent.desktop x-scheme-handler/minimax-agent 2>/dev/null || true
+        fi
+
+        # Alternative method using gio if available
+        if command -v gio >/dev/null 2>&1; then
+            gio mime x-scheme-handler/minimax minimax-agent.desktop 2>/dev/null || true
+            gio mime x-scheme-handler/minimax-agent minimax-agent.desktop 2>/dev/null || true
+        fi
+        ;;
+esac
+
+exit 0

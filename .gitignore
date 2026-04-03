@@ -1,0 +1,26 @@
+# Build artifacts
+*.deb
+*.rpm
+*.tar.gz
+output/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Package-specific
+linux-build/
+!linux-build/DEBIAN/
+!linux-build/usr/
+!linux-build/opt/
+
+# Downloaded installers
+*.exe
+*.msi

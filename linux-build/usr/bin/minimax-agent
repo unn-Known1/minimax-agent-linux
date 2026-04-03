@@ -1,0 +1,5 @@
+#!/bin/bash
+APP_DIR="/opt/minimax-agent"
+export LD_LIBRARY_PATH="${APP_DIR}:${LD_LIBRARY_PATH}"
+export ELECTRON_DISABLE_SECURITY_WARNINGS=1
+exec "${APP_DIR}/electron" --disable-gpu --no-sandbox "$@"

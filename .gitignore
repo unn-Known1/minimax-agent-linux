@@ -24,3 +24,6 @@ linux-build/
 # Downloaded installers
 *.exe
 *.msi
+
+# Cache
+.cache/

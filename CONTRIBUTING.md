@@ -23,7 +23,9 @@ The most valuable contribution is testing on different distributions:
 | Linux Mint  | 21.x    | Cinnamon| Tested |
 | Ubuntu      | 22.04+  | GNOME   | Likely works |
 | Debian      | 11+     | Various | Likely works |
-
+| Fedora      | 38+     | GNOME   | Needs testing |
+| RHEL        | 9+      | GNOME   | Needs testing |
+| openSUSE    | Tumbleweed | KDE  | Needs testing |
 Please report any test results by opening an issue!
 
 ### Documentation
@@ -52,11 +54,22 @@ Dependencies should install automatically. If not, install these:
 sudo apt install libgtk-3-0 libnss3 libasound2
 ```
 
-### Fedora/RHEL
-This package is .deb based. For RPM-based systems, you would need to convert it using `alien`:
+### Fedora/RHEL/openSUSE
+
+Native RPM packages are now supported. Use the RPM build script instead of converting the `.deb` with `alien`.
+
+**Fedora/RHEL:**
 ```bash
-sudo apt install alien
-sudo alien -r minimax-agent_3.0.13_amd64.deb
+sudo dnf install rpm-build rpmdevtools desktop-file-utils tar gzip
+./build-rpm.sh
+tests/verify-rpm.sh output/minimax-agent-3.0.13-1.*.x86_64.rpm
+```
+
+**openSUSE:**
+```bash
+sudo zypper install rpm-build desktop-file-utils tar gzip
+./build-rpm.sh
+tests/verify-rpm.sh output/minimax-agent-3.0.13-1.*.x86_64.rpm
 ```
 
 ## Code of Conduct

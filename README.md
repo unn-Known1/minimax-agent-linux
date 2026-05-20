@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Platform-Linux-blue" alt="Platform">
   <img src="https://img.shields.io/badge/Architecture-amd64-orange" alt="Architecture">
   <img src="https://img.shields.io/badge/Version-3.0.13-green" alt="Version">
-  <img src="https://img.shields.io/badge/Package-deb-red" alt="Package">
+  <img src="https://img.shields.io/badge/Package-deb%20%7C%20rpm-red" alt="Package">
 </p>
 
 > **Note**: This is an **unofficial community port** of MiniMax Agent for Linux. MiniMax does not currently offer an official Linux desktop application. This project aims to bring the MiniMax Agent experience to Linux users.
@@ -44,6 +44,18 @@ minimax-agent
 ## Supported Distributions
 
 - Linux Mint (primary tested)
+- Ubuntu 20.04+
+- Debian 10+
+- Fedora 38+
+- RHEL 9+
+- openSUSE Tumbleweed / Leap
+- Other Debian-based and RPM-based distributions with amd64 architecture
+- Ubuntu 20.04+
+- Debian 10+
+- Fedora 38+
+- RHEL 9+
+- openSUSE Tumbleweed / Leap
+- Other Debian-based and RPM-based distributions with amd64 architecture
 - Ubuntu 20.04+
 - Debian 10+
 - Other Debian-based distributions with amd64 architecture
@@ -87,6 +99,34 @@ git clone https://github.com/unn-Known1/minimax-agent-linux.git
 cd minimax-agent-linux
 chmod +x build.sh
 sudo ./build.sh
+```
+
+## Download RPM Package
+
+RPM packages are available for Fedora, RHEL-compatible distributions, and openSUSE.
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install ./minimax-agent-3.0.13-1.*.x86_64.rpm
+```
+
+**openSUSE:**
+```bash
+sudo zypper install ./minimax-agent-3.0.13-1.*.x86_64.rpm
+```
+
+## Building RPM Package
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install rpm-build rpmdevtools desktop-file-utils tar gzip
+./build-rpm.sh
+```
+
+**openSUSE:**
+```bash
+sudo zypper install rpm-build desktop-file-utils tar gzip
+./build-rpm.sh
 ```
 
 ## Contributing

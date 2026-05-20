@@ -99,3 +99,56 @@ sudo dpkg -r minimax-agent
 sudo rm -rf /opt/minimax-agent
 sudo rm -rf /var/cache/minimax-agent
 ```
+
+## RPM Installation (Fedora/RHEL/openSUSE)
+
+### Prerequisites
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install wget curl unzip gtk3 nss alsa-lib
+```
+
+**openSUSE:**
+```bash
+sudo zypper install wget curl unzip gtk3 mozilla-nss alsa-lib
+```
+
+### Install the RPM Package
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install ./minimax-agent-3.0.13-1.*.x86_64.rpm
+```
+
+**openSUSE:**
+```bash
+sudo zypper install ./minimax-agent-3.0.13-1.*.x86_64.rpm
+```
+
+### Verify Protocol Handler
+
+```bash
+xdg-mime query default x-scheme-handler/minimax
+xdg-mime query default x-scheme-handler/minimax-agent
+```
+
+Expected result: `minimax-agent.desktop`
+
+## RPM Uninstallation
+
+**Fedora/RHEL:**
+```bash
+sudo dnf remove minimax-agent
+```
+
+**openSUSE:**
+```bash
+sudo zypper remove minimax-agent
+```
+
+After uninstallation, optionally clean up:
+```bash
+sudo rm -rf /opt/minimax-agent
+sudo rm -rf /var/cache/minimax-agent
+```

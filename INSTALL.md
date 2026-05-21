@@ -1,120 +1,27 @@
 # Installation Guide
 
-This guide explains how to install the MiniMax Agent for Linux.
+This guide explains how to install MiniMax Agent for Linux from the self-contained release packages.
 
-## Prerequisites
+## Download
 
-Before installing, ensure you have the required dependencies:
+Download the latest package from the [GitHub Releases](https://github.com/unn-Known1/minimax-agent-linux/releases) page:
 
-```bash
-sudo apt update
-sudo apt install wget curl unzip libgtk-3-0 libnss3 libasound2 libxss1 libgbm1
-```
+- `.deb` for Ubuntu, Debian, Linux Mint, and other Debian-based distributions.
+- `.rpm` for Fedora, RHEL-compatible distributions, and openSUSE.
 
-## Full Installation Steps
+The release packages include the Electron runtime and application payload. You do not need to download runtime assets separately.
 
-### Step 1: Download the Package
+## Fedora/RHEL/openSUSE RPM Installation
 
-Download the latest `.deb` package from the [Releases](https://github.com/unn-Known1/minimax-agent-linux/releases) page.
+### Graphical install
 
-### Step 2: Download Binary Assets
+On desktop environments such as Fedora KDE Plasma or GNOME, download the `.rpm` release asset and double-click it. Your software installer should open and guide you through installation.
 
-Due to GitHub's file size limits, the binary files (Electron runtime) are hosted separately.
+This flow was tested on Fedora 44 KDE Plasma.
 
-Download the binary package:
-```bash
-wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.13/electron-runtime.tar.gz
-```
+### Terminal fallback
 
-Extract to `/opt/`:
-```bash
-sudo tar -xzf electron-runtime.tar.gz -C /opt/
-```
-
-### Step 3: Install the .deb Package
-
-```bash
-sudo dpkg -i minimax-agent_3.0.13_amd64.deb
-```
-
-### Step 4: Fix Dependencies (if needed)
-
-If you see dependency errors:
-```bash
-sudo apt --fix-broken install
-```
-
-### Step 5: Launch
-
-You can launch MiniMax Agent from:
-- Application menu
-- Terminal: `minimax-agent`
-- Or by clicking the desktop icon (if created)
-
-## File Locations
-
-After installation:
-- Application binary: `/opt/minimax-agent/electron`
-- Resources: `/opt/minimax-agent/resources/`
-- Desktop file: `/usr/share/applications/minimax-agent.desktop`
-- Launcher: `/usr/bin/minimax-agent`
-
-## Troubleshooting
-
-### "Command not found" after installation
-
-Log out and log back in, or run:
-```bash
-hash -r
-```
-
-### App doesn't start
-
-Check if Electron is present:
-```bash
-ls -la /opt/minimax-agent/electron
-```
-
-If missing, re-run the binary download step.
-
-### Google login fails
-
-Check protocol handler registration:
-```bash
-xdg-mime query default x-scheme-handler/minimax
-```
-
-Should return: `minimax-agent.desktop`
-
-If not, run:
-```bash
-xdg-mime default minimax-agent.desktop x-scheme-handler/minimax
-xdg-mime default minimax-agent.desktop x-scheme-handler/minimax-agent
-```
-
-## Uninstallation
-
-```bash
-sudo dpkg -r minimax-agent
-sudo rm -rf /opt/minimax-agent
-sudo rm -rf /var/cache/minimax-agent
-```
-
-## RPM Installation (Fedora/RHEL/openSUSE)
-
-### Prerequisites
-
-**Fedora/RHEL:**
-```bash
-sudo dnf install wget curl unzip gtk3 nss alsa-lib
-```
-
-**openSUSE:**
-```bash
-sudo zypper install wget curl unzip gtk3 mozilla-nss alsa-lib
-```
-
-### Install the RPM Package
+If graphical installation is unavailable, install the RPM from a terminal.
 
 **Fedora/RHEL:**
 ```bash
@@ -126,16 +33,90 @@ sudo dnf install ./minimax-agent-3.0.13-1.*.x86_64.rpm
 sudo zypper install ./minimax-agent-3.0.13-1.*.x86_64.rpm
 ```
 
-### Verify Protocol Handler
+## Ubuntu/Debian/Linux Mint DEB Installation
+
+```bash
+sudo dpkg -i minimax-agent_3.0.13_amd64.deb
+sudo apt --fix-broken install
+```
+
+## Launch
+
+You can launch MiniMax Agent from:
+
+- Your application menu.
+- The desktop icon, if your environment creates one.
+- A terminal:
+
+```bash
+minimax-agent
+```
+
+## File Locations
+
+After installation:
+
+- Application binary: `/opt/minimax-agent/electron`
+- Resources: `/opt/minimax-agent/resources/`
+- Desktop file: `/usr/share/applications/minimax-agent.desktop`
+- Launcher: `/usr/bin/minimax-agent`
+
+## Verify Protocol Handler
+
+The package registers the `minimax://` and `minimax-agent://` protocol handlers for OAuth callbacks.
 
 ```bash
 xdg-mime query default x-scheme-handler/minimax
 xdg-mime query default x-scheme-handler/minimax-agent
 ```
 
-Expected result: `minimax-agent.desktop`
+Expected result:
 
-## RPM Uninstallation
+```text
+minimax-agent.desktop
+```
+
+If either handler is missing, register it manually:
+
+```bash
+xdg-mime default minimax-agent.desktop x-scheme-handler/minimax
+xdg-mime default minimax-agent.desktop x-scheme-handler/minimax-agent
+```
+
+## Troubleshooting
+
+### Command not found after installation
+
+Log out and log back in, or refresh your shell command cache:
+
+```bash
+hash -r
+```
+
+### App does not start
+
+Run the launcher from a terminal to see startup logs:
+
+```bash
+minimax-agent
+```
+
+You can also check whether the Electron runtime is installed:
+
+```bash
+ls -la /opt/minimax-agent/electron
+```
+
+### Google login fails
+
+Check protocol handler registration with the commands in [Verify Protocol Handler](#verify-protocol-handler).
+
+## Uninstallation
+
+**Ubuntu/Debian/Linux Mint:**
+```bash
+sudo dpkg -r minimax-agent
+```
 
 **Fedora/RHEL:**
 ```bash
@@ -147,7 +128,8 @@ sudo dnf remove minimax-agent
 sudo zypper remove minimax-agent
 ```
 
-After uninstallation, optionally clean up:
+After uninstallation, optionally clean up local application files:
+
 ```bash
 sudo rm -rf /opt/minimax-agent
 sudo rm -rf /var/cache/minimax-agent

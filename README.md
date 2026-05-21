@@ -9,26 +9,43 @@
 
 > **Note**: This is an **unofficial community port** of MiniMax Agent for Linux. MiniMax does not currently offer an official Linux desktop application. This project aims to bring the MiniMax Agent experience to Linux users.
 
-## Download .deb Package
+## Download Packages
 
-**Direct Download:** Click on the `.deb` file in the `releases/` folder above, or use:
-```bash
-wget https://github.com/unn-Known1/minimax-agent-linux/raw/main/releases/minimax-agent_3.0.13_amd64.deb
-```
+Download the latest package from the [GitHub Releases](https://github.com/unn-Known1/minimax-agent-linux/releases) page:
+
+- `.deb` for Ubuntu, Debian, Linux Mint, and other Debian-based distributions.
+- `.rpm` for Fedora, RHEL-compatible distributions, and openSUSE.
+
+Release packages are self-contained and include the Electron runtime and application payload.
 
 ## Installation
 
+### Fedora/RHEL/openSUSE RPM
+
+On desktop environments such as Fedora KDE Plasma or GNOME, download the `.rpm` release asset and double-click it to install with your graphical software installer.
+
+If graphical installation is unavailable, install from a terminal instead:
+
+**Fedora/RHEL:**
 ```bash
-# Download the package
-wget https://github.com/unn-Known1/minimax-agent-linux/raw/main/releases/minimax-agent_3.0.13_amd64.deb
+sudo dnf install ./minimax-agent-3.0.13-1.*.x86_64.rpm
+```
 
-# Install
+**openSUSE:**
+```bash
+sudo zypper install ./minimax-agent-3.0.13-1.*.x86_64.rpm
+```
+
+### Ubuntu/Debian/Linux Mint DEB
+
+```bash
 sudo dpkg -i minimax-agent_3.0.13_amd64.deb
-
-# Fix dependencies if needed
 sudo apt --fix-broken install
+```
 
-# Launch
+Launch MiniMax Agent from your application menu, or run:
+
+```bash
 minimax-agent
 ```
 
@@ -43,22 +60,13 @@ minimax-agent
 
 ## Supported Distributions
 
-- Linux Mint (primary tested)
+- Linux Mint
 - Ubuntu 20.04+
 - Debian 10+
-- Fedora 38+
+- Fedora 38+; Fedora 44 KDE Plasma tested
 - RHEL 9+
 - openSUSE Tumbleweed / Leap
 - Other Debian-based and RPM-based distributions with amd64 architecture
-- Ubuntu 20.04+
-- Debian 10+
-- Fedora 38+
-- RHEL 9+
-- openSUSE Tumbleweed / Leap
-- Other Debian-based and RPM-based distributions with amd64 architecture
-- Ubuntu 20.04+
-- Debian 10+
-- Other Debian-based distributions with amd64 architecture
 
 ## System Requirements
 
@@ -73,8 +81,19 @@ The package will automatically install required dependencies.
 
 ## Uninstallation
 
+**Ubuntu/Debian/Linux Mint:**
 ```bash
 sudo dpkg -r minimax-agent
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf remove minimax-agent
+```
+
+**openSUSE:**
+```bash
+sudo zypper remove minimax-agent
 ```
 
 ## Troubleshooting
@@ -99,20 +118,6 @@ git clone https://github.com/unn-Known1/minimax-agent-linux.git
 cd minimax-agent-linux
 chmod +x build.sh
 sudo ./build.sh
-```
-
-## Download RPM Package
-
-RPM packages are available for Fedora, RHEL-compatible distributions, and openSUSE.
-
-**Fedora/RHEL:**
-```bash
-sudo dnf install ./minimax-agent-3.0.13-1.*.x86_64.rpm
-```
-
-**openSUSE:**
-```bash
-sudo zypper install ./minimax-agent-3.0.13-1.*.x86_64.rpm
 ```
 
 ## Building RPM Package

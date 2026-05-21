@@ -1,0 +1,4 @@
+/.gitattributes text eol=lf
+*.sh text eol=lf
+linux-build/DEBIAN/postinst text eol=lf
+linux-build/DEBIAN/prerm text eol=lf

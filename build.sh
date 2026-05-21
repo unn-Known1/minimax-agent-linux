@@ -34,6 +34,7 @@ fi
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
+chmod 755 "$OUTPUT_DIR"
 
 # Check for required tools
 echo "[1/4] Checking build dependencies..."
@@ -76,6 +77,16 @@ if [ -d "$BUILD_DIR/DEBIAN" ]; then
             exit 1
             ;;
     esac
+fi
+
+# Ensure maintainer scripts are executable (required by dpkg)
+if [ -d "$BUILD_DIR/DEBIAN" ]; then
+    chmod 755 "$BUILD_DIR/DEBIAN"/postinst "$BUILD_DIR/DEBIAN"/prerm 2>/dev/null || true
+fi
+
+# Ensure launcher is executable
+if [ -f "$BUILD_DIR/usr/bin/minimax-agent" ]; then
+    chmod 755 "$BUILD_DIR/usr/bin/minimax-agent"
 fi
 
 # Build the package

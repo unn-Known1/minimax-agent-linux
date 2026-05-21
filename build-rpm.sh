@@ -191,6 +191,24 @@ ensure_app_payload() {
     echo "  Package payload staged successfully."
 }
 
+normalize_text_payload() {
+    local file
+    local text_files=(
+        "${BUILD_DIR}/usr/bin/minimax-agent"
+        "${BUILD_DIR}/usr/share/applications/minimax-agent.desktop"
+        "${APP_DIR}/LICENSES.chromium.html"
+        "${APP_DIR}/resources/app-update.yml"
+        "${APP_DIR}/version"
+    )
+
+    for file in "${text_files[@]}"; do
+        if [ -f "$file" ] && LC_ALL=C grep -q $'\r' "$file"; then
+            sed -i 's/\r$//' "$file"
+            echo "  Normalized line endings: ${file#"${SCRIPT_DIR}/"}"
+        fi
+    done
+}
+
 echo "=========================================="
 echo "  MiniMax Agent RPM Build Script"
 echo "=========================================="
@@ -206,11 +224,15 @@ if [ ! -d "${BUILD_DIR}/usr" ]; then
     exit 1
 fi
 
-echo "[1/6] Ensuring application payload..."
+echo "[1/7] Ensuring application payload..."
 ensure_app_payload
 echo ""
 
-echo "[2/6] Checking build dependencies..."
+echo "[2/7] Normalizing text payload..."
+normalize_text_payload
+echo ""
+
+echo "[3/7] Checking build dependencies..."
 missing_tools=()
 command -v rpmbuild >/dev/null 2>&1 || missing_tools+=("rpm-build")
 command -v tar >/dev/null 2>&1 || missing_tools+=("tar")
@@ -226,11 +248,11 @@ fi
 echo "  All dependencies satisfied."
 echo ""
 
-echo "[3/6] Preparing rpmbuild tree..."
+echo "[4/7] Preparing rpmbuild tree..."
 rm -rf "$RPMBUILD_DIR"
 mkdir -p "$SOURCE_DIR" "$SPECS_DIR" "${RPMBUILD_DIR}/BUILD" "${RPMBUILD_DIR}/BUILDROOT" "${RPMBUILD_DIR}/RPMS" "${RPMBUILD_DIR}/SRPMS" "$OUTPUT_DIR"
 
-echo "[4/6] Creating source archive..."
+echo "[5/7] Creating source archive..."
 tar \
     --exclude=".git" \
     --exclude=".cache" \
@@ -244,12 +266,12 @@ tar \
 
 cp "$SPEC_FILE" "$SPECS_DIR/"
 
-echo "[5/6] Building RPM..."
+echo "[6/7] Building RPM..."
 rpmbuild \
     --define "_topdir ${RPMBUILD_DIR}" \
     -bb "${SPECS_DIR}/${PACKAGE_NAME}.spec"
 
-echo "[6/6] Collecting output..."
+echo "[7/7] Collecting output..."
 rpm_path="$(find "${RPMBUILD_DIR}/RPMS/${ARCH}" -type f -name "${PACKAGE_NAME}-${VERSION}-*.${ARCH}.rpm" | head -n 1)"
 
 if [ -z "$rpm_path" ] || [ ! -f "$rpm_path" ]; then

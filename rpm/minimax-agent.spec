@@ -1,4 +1,6 @@
 %global appdir /opt/%{name}
+%global _build_id_links none
+%global debug_package %{nil}
 
 Name:           minimax-agent
 Version:        3.0.13
@@ -74,24 +76,22 @@ custom protocol handlers, and application payload under /opt/minimax-agent.
 
 %install
 rm -rf %{buildroot}
-
-if [ ! -d linux-build/usr ]; then
-    echo "Missing linux-build/usr payload"
-    exit 1
+mkdir -p %{buildroot}%{_bindir}
+mkdir -p %{buildroot}%{_datadir}/applications
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
+mkdir -p %{buildroot}%{appdir}
+cp -a linux-build/opt/minimax-agent/* %{buildroot}%{appdir}/
+if [ -f linux-build/usr/bin/minimax-agent ]; then
+    cp linux-build/usr/bin/minimax-agent %{buildroot}%{_bindir}/minimax-agent
+    chmod 0755 %{buildroot}%{_bindir}/minimax-agent
 fi
-
-if [ ! -d linux-build/opt/minimax-agent ]; then
-    echo "Missing linux-build/opt/minimax-agent payload"
-    echo "Stage Electron/runtime assets before building the RPM."
-    exit 1
+if [ -f linux-build/usr/share/applications/minimax-agent.desktop ]; then
+    cp linux-build/usr/share/applications/minimax-agent.desktop %{buildroot}%{_datadir}/applications/
+    desktop-file-validate %{buildroot}%{_datadir}/applications/minimax-agent.desktop
 fi
-
-cp -a linux-build/usr %{buildroot}/
-cp -a linux-build/opt %{buildroot}/
-
-chmod 0755 %{buildroot}%{_bindir}/minimax-agent
-
-desktop-file-validate %{buildroot}%{_datadir}/applications/minimax-agent.desktop
+if [ -d linux-build/usr/share/icons/hicolor ]; then
+    cp -a linux-build/usr/share/icons/hicolor/* %{buildroot}%{_datadir}/icons/hicolor/
+fi
 
 %post
 if [ -x /usr/bin/update-desktop-database ]; then
@@ -133,7 +133,6 @@ fi
 %files
 %{_bindir}/minimax-agent
 %{_datadir}/applications/minimax-agent.desktop
-%{_datadir}/icons/hicolor/*/apps/minimax-agent.*
 %{appdir}
 
 %changelog

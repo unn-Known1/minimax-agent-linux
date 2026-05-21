@@ -3,6 +3,11 @@ set -euo pipefail
 
 rpm_file="${1:?Usage: tests/verify-rpm.sh path/to/minimax-agent.rpm}"
 
+case "$rpm_file" in
+  /*) ;;
+  *) rpm_file="$(pwd)/$rpm_file" ;;
+esac
+
 command -v rpm >/dev/null
 command -v rpm2cpio >/dev/null
 command -v cpio >/dev/null
@@ -37,5 +42,15 @@ grep -q "MimeType=x-scheme-handler/minimax;x-scheme-handler/minimax-agent;" \
   "$tmpdir/usr/share/applications/minimax-agent.desktop"
 
 test -x "$tmpdir/usr/bin/minimax-agent"
+
+if LC_ALL=C grep -q $'\r' "$tmpdir/usr/bin/minimax-agent"; then
+  echo "Launcher contains CRLF line endings: /usr/bin/minimax-agent"
+  exit 1
+fi
+
+if LC_ALL=C grep -q $'\r' "$tmpdir/usr/share/applications/minimax-agent.desktop"; then
+  echo "Desktop entry contains CRLF line endings: /usr/share/applications/minimax-agent.desktop"
+  exit 1
+fi
 
 echo "RPM validation passed: $rpm_file"

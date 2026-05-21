@@ -1,6 +1,7 @@
 # Build artifacts
 *.deb
 *.rpm
+!Dockerfile.rpm
 *.tar.gz
 output/
 *.log

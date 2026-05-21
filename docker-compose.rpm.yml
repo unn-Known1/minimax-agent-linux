@@ -1,0 +1,29 @@
+# Build RPM using Docker
+
+# Quick build:
+# docker build -f Dockerfile.rpm -t minimax-rpm-builder .
+# docker create --name extract-rpm minimax-rpm-builder
+# docker cp extract-rpm:/build/output ./docker-output
+# docker rm extract-rpm
+
+# Or use docker-compose:
+# docker-compose -f docker-compose.rpm.yml up
+
+version: '3.8'
+
+services:
+  build-rpm:
+    build:
+      context: .
+      dockerfile: Dockerfile.rpm
+    image: minimax-rpm-builder
+    container_name: minimax-rpm-build
+    volumes:
+      - ./docker-output:/build/output
+    command: >
+      bash -c "
+        ./build-rpm.sh &&
+        cp output/*.rpm /build/output/ &&
+        echo 'RPM built successfully!' &&
+        ls -lh /build/output/
+      "

@@ -1,0 +1,34 @@
+# Dockerfile for building minimax-agent RPM on Fedora
+FROM fedora:40
+
+# Install build dependencies
+RUN dnf install -y \
+    rpm-build \
+    rpmdevtools \
+    desktop-file-utils \
+    tar \
+    gzip \
+    curl \
+    binutils \
+    cpio \
+    findutils \
+    grep \
+    xz \
+    zstd \
+    git \
+    && dnf clean all
+
+# Set working directory
+WORKDIR /build
+
+# Copy the repository
+COPY . /build/
+
+# Build the RPM
+RUN ./build-rpm.sh
+
+# Output directory
+VOLUME ["/build/output"]
+
+# Default command
+CMD ["ls", "-lh", "/build/output/"]

@@ -1,9 +1,10 @@
 %global appdir /opt/%{name}
+%{!?app_version:%global app_version 3.0.13}
 %global _build_id_links none
 %global debug_package %{nil}
 
 Name:           minimax-agent
-Version:        3.0.13
+Version:        %{app_version}
 Release:        1%{?dist}
 Summary:        MiniMax Agent Desktop Application
 License:        LicenseRef-Proprietary

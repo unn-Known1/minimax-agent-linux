@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="3.0.13"
 PACKAGE_NAME="minimax-agent"
 ARCH="x86_64"
 DEB_ARCH="amd64"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION="${VERSION:-$(sed -nE 's/^VERSION="([^"]+)"/\1/p' "${SCRIPT_DIR}/build.sh" | head -n 1 | tr -d '\r')}"
 BUILD_DIR="${SCRIPT_DIR}/linux-build"
 APP_DIR="${BUILD_DIR}/opt/minimax-agent"
 RPM_DIR="${SCRIPT_DIR}/rpm"
@@ -17,8 +17,13 @@ SOURCE_DIR="${RPMBUILD_DIR}/SOURCES"
 SPECS_DIR="${RPMBUILD_DIR}/SPECS"
 CACHE_DIR="${SCRIPT_DIR}/.cache"
 DEB_FILE="${CACHE_DIR}/${PACKAGE_NAME}_${VERSION}_${DEB_ARCH}.deb"
-DEB_URL="https://github.com/unn-Known1/minimax-agent-linux/releases/download/v${VERSION}/${PACKAGE_NAME}_${VERSION}_${DEB_ARCH}.deb"
+DEB_URL="${DEB_URL:-https://github.com/unn-Known1/minimax-agent-linux/releases/download/v${VERSION}/${PACKAGE_NAME}_${VERSION}_${DEB_ARCH}.deb}"
 MIN_DEB_SIZE=$((50 * 1024 * 1024))
+
+if [ -z "$VERSION" ]; then
+    echo "Unable to determine package version from build.sh."
+    exit 1
+fi
 
 file_size() {
     stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null
@@ -88,7 +93,7 @@ download_deb() {
     echo "  URL: $DEB_URL"
 
     rm -f "$tmp_file"
-    if ! curl -fL --retry 3 --retry-delay 2 -o "$tmp_file" "$DEB_URL"; then
+    if ! curl -fL --retry 12 --retry-delay 10 --retry-all-errors -o "$tmp_file" "$DEB_URL"; then
         rm -f "$tmp_file"
         echo "Failed to download .deb package."
         exit 1
@@ -269,6 +274,7 @@ cp "$SPEC_FILE" "$SPECS_DIR/"
 echo "[6/7] Building RPM..."
 rpmbuild \
     --define "_topdir ${RPMBUILD_DIR}" \
+    --define "app_version ${VERSION}" \
     -bb "${SPECS_DIR}/${PACKAGE_NAME}.spec"
 
 echo "[7/7] Collecting output..."

@@ -56,7 +56,7 @@ sudo apt install libgtk-3-0 libnss3 libasound2
 This package is .deb based. For RPM-based systems, you would need to convert it using `alien`:
 ```bash
 sudo apt install alien
-sudo alien -r minimax-agent_3.0.67_amd64.deb
+sudo alien -r minimax-agent_3.0.68_amd64.deb
 ```
 
 ## Code of Conduct

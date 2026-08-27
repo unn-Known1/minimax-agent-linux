@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux-blue" alt="Platform">
   <img src="https://img.shields.io/badge/Architecture-amd64-orange" alt="Architecture">
-  <img src="https://img.shields.io/badge/Version-3.0.67-green" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.0.68-green" alt="Version">
   <img src="https://img.shields.io/badge/Package-deb-red" alt="Package">
 </p>
 
@@ -13,17 +13,17 @@
 
 **Direct Download:** Click on the `.deb` file in the `releases/` folder above, or use:
 ```bash
-wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.67/minimax-agent_3.0.67_amd64.deb
+wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.68/minimax-agent_3.0.68_amd64.deb
 ```
 
 ## Installation
 
 ```bash
 # Download the package
-wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.67/minimax-agent_3.0.67_amd64.deb
+wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.68/minimax-agent_3.0.68_amd64.deb
 
 # Install
-sudo dpkg -i minimax-agent_3.0.67_amd64.deb
+sudo dpkg -i minimax-agent_3.0.68_amd64.deb
 
 # Fix dependencies if needed
 sudo apt --fix-broken install

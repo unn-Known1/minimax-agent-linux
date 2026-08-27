@@ -16,7 +16,7 @@ sudo apt install wget curl unzip libgtk-3-0 libnss3 libasound2 libxss1 libgbm1 n
 ### Step 1: Install the .deb Package
 
 ```bash
-sudo dpkg -i minimax-agent_3.0.67_amd64.deb
+sudo dpkg -i minimax-agent_3.0.68_amd64.deb
 sudo apt --fix-broken install
 ```
 

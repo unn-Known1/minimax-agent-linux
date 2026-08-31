@@ -215,8 +215,9 @@ if [ "${USE_DOCKER}" -eq 1 ]; then
                         PKGDEST=/pkgdest SRCDEST=/srcdest
                 "
         '
-    # Copy the .pkg.tar.zst back
-    find "${DOCKER_PKGDEST}" -name 'minimax-agent-*.pkg.tar.zst' -exec cp {} "${OUTPUT_DIR}/" \;
+    # Copy the .pkg.tar.zst back (may be owned by root from Docker)
+    sudo find "${DOCKER_PKGDEST}" -name 'minimax-agent-*.pkg.tar.zst' -exec cp {} "${OUTPUT_DIR}/" \; 2>/dev/null || find "${DOCKER_PKGDEST}" -name 'minimax-agent-*.pkg.tar.zst' -exec cp {} "${OUTPUT_DIR}/" \; 2>/dev/null || true
+    sudo chown -R "$(id -u):$(id -g)" "${DOCKER_PKGDEST}" 2>/dev/null || true
 else
     log "Building on host ($(is_cachyos && echo Cachy || (is_arch && echo Arch || echo unknown)))..."
     command -v makepkg >/dev/null 2>&1 || \

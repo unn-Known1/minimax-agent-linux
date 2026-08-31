@@ -2,5 +2,7 @@
 APP_DIR="/opt/minimax-agent"
 export LD_LIBRARY_PATH="${APP_DIR}:${LD_LIBRARY_PATH}"
 export ELECTRON_DISABLE_SECURITY_WARNINGS=1
-export NODE_OPTIONS="--experimental-require-module"
+# No NODE_OPTIONS needed: Electron 35 bundles Node 22, where require(esm)
+# is enabled by default. The previous --experimental-require-module flag
+# triggered a Node 20.18 internal assertion in the ESM translator.
 exec "${APP_DIR}/electron" "${APP_DIR}/resources/app.asar" --disable-gpu --no-sandbox "$@"

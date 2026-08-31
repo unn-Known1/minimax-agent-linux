@@ -97,6 +97,42 @@ ASAR_UNPACKED_SRC="$RELEASE_DIR/app.asar.unpacked"
 ASAR_UNPACKED_DST="$BUILD_DIR/opt/minimax-agent/resources/app.asar.unpacked"
 
 echo ""
+
+# Backfill any missing platform-specific optional binaries into the unpacked
+# tree (e.g. @vscode/ripgrep-linux-x64). The upstream Windows installer
+# sometimes skips optionalDependencies, so the .deb would ship without the
+# binary and the app would crash on startup. This function fetches them via
+# npm and stages them into app.asar.unpacked before the .deb is built.
+backfill_platform_binaries() {
+    local unpacked="$1"
+    [ -d "$unpacked" ] || return 0
+    local missing=()
+    [ -d "$unpacked/node_modules/@vscode/ripgrep-linux-x64" ] || missing+=("ripgrep-linux-x64")
+    if [ ${#missing[@]} -eq 0 ]; then
+        echo "  All platform binaries present."
+        return 0
+    fi
+    echo "  Back-filling missing platform binaries: ${missing[*]}"
+    local stage
+    stage="/tmp/minimax-bin-backfill.$$"
+    mkdir -p "$stage"
+    ( cd "$stage"
+      printf '{\n  "name": "minimax-backfill",\n  "version": "1.0.0",\n  "private": true,\n  "dependencies": { "@vscode/ripgrep": "*" }\n}\n' > package.json
+      if command -v npm >/dev/null 2>&1; then
+          npm install --no-audit --no-fund --omit=dev 2>&1 | tail -3
+          for pkg in "${missing[@]}"; do
+              if [ -d "node_modules/@vscode/$pkg" ]; then
+                  mkdir -p "$unpacked/node_modules/@vscode"
+                  cp -a "node_modules/@vscode/$pkg" "$unpacked/node_modules/@vscode/"
+              fi
+          done
+      else
+          echo "  WARNING: npm not available at build time; install hook will backfill"
+      fi
+    )
+    unset stage
+}
+
 echo "[3/6] Preparing native modules..."
 
 # 1. Copy app.asar from Windows release source if present
@@ -115,6 +151,8 @@ if [ ! -d "$ASAR_UNPACKED_DST" ]; then
     if [ -d "$ASAR_UNPACKED_SRC" ]; then
         echo "  Copying app.asar.unpacked from Windows release..."
         cp -r "$ASAR_UNPACKED_SRC" "$ASAR_UNPACKED_DST"
+        echo '[3.5/6] Back-filling platform binaries (if needed)...'
+        backfill_platform_binaries "$ASAR_UNPACKED_DST" || true
     else
         echo "  WARNING: app.asar.unpacked not found at $ASAR_UNPACKED_SRC"
     fi

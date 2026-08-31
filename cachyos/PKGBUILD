@@ -54,7 +54,7 @@ depends=(
 makedepends=(
     'git'
     'wget'
-    'bsdtar'
+    'libarchive'         # provides bsdtar
     'npm'                # for back-filling @vscode/ripgrep platform binaries
 )
 optdepends=(

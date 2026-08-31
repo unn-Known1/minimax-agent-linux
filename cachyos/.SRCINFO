@@ -26,13 +26,20 @@ pkgbase = minimax-agent
 	depends = mesa
 	depends = alsa-lib
 	depends = nodejs>=18
+	depends = electron
+	depends = ripgrep
 	makedepends = git
+	makedepends = wget
+	makedepends = libarchive
+	makedepends = npm
 	optdepends = xdg-utils: xdg-mime based protocol handler registration
 	optdepends = systemd: user service for the backend daemon (auto-restart)
 	optdepends = gtk-update-icon-cache: refresh hicolor icon cache
 	optdepends = cachyos-ananicy-rules: better process scheduling on Cachy OS
 	optdepends = cachyos-package-manager: detect Cachy OS in post-install hints
 	source = minimax-agent-linux-3.0.68.tar.gz::https://github.com/unn-Known1/minimax-agent-linux/archive/refs/tags/v3.0.68.tar.gz
+	source = minimax-agent_3.0.68_amd64.deb::https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.68/minimax-agent_3.0.68_amd64.deb
+	sha256sums = SKIP
 	sha256sums = SKIP
 	install = minimax-agent.install
 

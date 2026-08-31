@@ -151,12 +151,14 @@ if [ ! -d "$ASAR_UNPACKED_DST" ]; then
     if [ -d "$ASAR_UNPACKED_SRC" ]; then
         echo "  Copying app.asar.unpacked from Windows release..."
         cp -r "$ASAR_UNPACKED_SRC" "$ASAR_UNPACKED_DST"
-        echo '[3.5/6] Back-filling platform binaries (if needed)...'
-        backfill_platform_binaries "$ASAR_UNPACKED_DST" || true
     else
         echo "  WARNING: app.asar.unpacked not found at $ASAR_UNPACKED_SRC"
     fi
 fi
+
+# 2b. Back-fill missing platform binaries (always, even if unpacked already existed)
+echo '[3.5/6] Back-filling platform binaries (if needed)...'
+backfill_platform_binaries "$ASAR_UNPACKED_DST" || true
 
 # 3. Rebuild better-sqlite3 for Electron's Node.js ABI if source is available
 if [ -d "$ASAR_UNPACKED_DST/node_modules/better-sqlite3" ]; then

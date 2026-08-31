@@ -206,8 +206,8 @@ if [ "${USE_DOCKER}" -eq 1 ]; then
         archlinux:latest \
         bash -c '
             set -e
-            pacman -Sy --noconfirm --needed base-devel git && \
-                useradd -m builder && chown -R builder:builder /work /srcdest /pkgdest && \
+            pacman -Sy --noconfirm --needed base-devel git sudo --needed --noconfirm && \
+                useradd -m builder && echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && chown -R builder:builder /work /srcdest /pkgdest && \
                 sudo -u builder bash -c "
                     cd /work/cachyos && \
                     makepkg --syncdeps --noconfirm --nocheck --clean --skippgpcheck --skipinteg --holdver \

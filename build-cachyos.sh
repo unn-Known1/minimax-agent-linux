@@ -198,6 +198,7 @@ if [ "${USE_DOCKER}" -eq 1 ]; then
     trap 'rm -rf "${DOCKER_WORK}"' EXIT
     cp -a "${SCRIPT_DIR}/cachyos" "${DOCKER_WORK}/"
     cp "${TARBALL}" "${DOCKER_WORK}/"
+    cp "${TARBALL}" "${DOCKER_SRCDEST}/"
 
     docker run --rm \
         -v "${DOCKER_WORK}:/work" \

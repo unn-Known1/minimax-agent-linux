@@ -138,7 +138,7 @@ fi
 if [ "${NEEDS_TARBALL}" -eq 1 ]; then
     log "Building source tarball from working tree..."
     TMPDIR_SRC="$(mktemp -d)"
-    trap 'rm -rf "${TMPDIR_SRC}"' EXIT
+    trap 'rm -rf "${TMPDIR_SRC}" 2>/dev/null || sudo rm -rf "${TMPDIR_SRC}" 2>/dev/null || true' EXIT
     SRC_STAGE="${TMPDIR_SRC}/minimax-agent-linux-${PKGVER}"
     mkdir -p "${SRC_STAGE}"
     # Copy everything except heavy / generated dirs
@@ -191,11 +191,11 @@ if [ "${USE_DOCKER}" -eq 1 ]; then
     log "Building inside Docker (archlinux:latest)..."
     DOCKER_SRCDEST="$(mktemp -d)"
     DOCKER_PKGDEST="$(mktemp -d)"
-    trap 'rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}"' EXIT
+    trap 'rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}" 2>/dev/null || sudo rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}" 2>/dev/null || true' EXIT
 
     # Stage: copy project + tarball into a build dir the container can see
     DOCKER_WORK="$(mktemp -d)"
-    trap 'rm -rf "${DOCKER_WORK}"' EXIT
+    trap 'rm -rf "${DOCKER_WORK}" 2>/dev/null || sudo rm -rf "${DOCKER_WORK}" 2>/dev/null || true' EXIT
     cp -a "${SCRIPT_DIR}/cachyos" "${DOCKER_WORK}/"
     cp "${TARBALL}" "${DOCKER_WORK}/"
     cp "${TARBALL}" "${DOCKER_SRCDEST}/"
@@ -230,7 +230,7 @@ else
     # Run makepkg from the cachyos/ dir, with our tarball cached
     SRCDEST_STAGE="$(mktemp -d)"
     PKGDEST_STAGE="$(mktemp -d)"
-    trap 'rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}"' EXIT
+    trap 'rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}" 2>/dev/null || sudo rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}" 2>/dev/null || true' EXIT
     cp "${TARBALL}" "${SRCDEST_STAGE}/"
 
     ( cd "${PKG_DIR}" && \

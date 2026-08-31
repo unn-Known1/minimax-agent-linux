@@ -2,4 +2,5 @@
 APP_DIR="/opt/minimax-agent"
 export LD_LIBRARY_PATH="${APP_DIR}:${LD_LIBRARY_PATH}"
 export ELECTRON_DISABLE_SECURITY_WARNINGS=1
-exec "${APP_DIR}/electron" --disable-gpu --no-sandbox "$@"
+export NODE_OPTIONS="--experimental-require-module"
+exec "${APP_DIR}/electron" "${APP_DIR}/resources/app.asar" --disable-gpu --no-sandbox "$@"

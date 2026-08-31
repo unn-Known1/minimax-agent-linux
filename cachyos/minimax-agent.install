@@ -1,0 +1,266 @@
+# minimax-agent.install — pacman hooks for MiniMax Agent
+#
+# This is the Arch/Cachy OS counterpart of the .deb's postinst/prerm.
+# It is invoked by pacman with one of:
+#   $1 = pre_install | post_install | pre_upgrade | post_upgrade | pre_remove
+#
+# It handles:
+#   - XDG desktop + icon cache refresh
+#   - Protocol handler registration (minimax://, minimax-agent://)
+#   - Per-user daemon directories under ~/.mavis
+#   - systemd user linger enablement so `mavis.service` survives logout
+#   - chrome-sandbox SUID bit (defense in depth)
+#   - Optional opencode binary install hint
+
+# Common paths
+APP_DIR="/opt/minimax-agent"
+DESKTOP_FILE="minimax-agent.desktop"
+SCHEMES="minimax minimax-agent"
+DAEMON_DIR="${APP_DIR}/resources/resources/daemon"
+
+# Detect the user we are acting on behalf of. pacman runs as root,
+# so SUDO_USER (set by sudo) is the most reliable signal.
+PACMAN_USER="${SUDO_USER:-}"
+if [ -z "${PACMAN_USER}" ]; then
+    # Fall back to the user who owns the active X session, if any.
+    PACMAN_USER="$(logname 2>/dev/null || true)"
+fi
+
+
+# Backfill @vscode/ripgrep-linux-x64 if missing. Catches installs from
+# pre-built .pkg.tar.zst files where the backfill did not run at build time
+# (e.g. someone built on a host without npm).
+# Stage a fallback @vscode/ripgrep-linux-x64 package that points at the
+# system ripgrep. The .deb from upstream often ships without the platform
+# binary; npm install of the real package sometimes fails offline. In
+# either case, the @vscode/ripgrep wrapper requires the platform package
+# to be resolvable via `require()`, so a bare symlink to /usr/bin/rg
+# is not enough — we need the full directory structure with package.json
+# and index.js exporting the binary path.
+stage_ripgrep_fallback() {
+    local target_dir="$1"
+    if [ -d "$target_dir" ] && [ -f "$target_dir/bin/rg" ] && [ -f "$target_dir/package.json" ]; then
+        return 0  # already complete
+    fi
+    if ! command -v rg >/dev/null 2>&1; then
+        echo "minimax-agent: WARNING - system ripgrep not found; install ripgrep package" >&2
+        return 1
+    fi
+    mkdir -p "$target_dir/bin"
+    ln -sf "$(command -v rg)" "$target_dir/bin/rg"
+    cat > "$target_dir/package.json" <<'PKGJSON'
+{
+  "name": "@vscode/ripgrep-linux-x64",
+  "version": "1.0.0-system-rg",
+  "description": "System ripgrep wrapper for @vscode/ripgrep on Cachy OS / Arch",
+  "main": "index.js",
+  "bin": { "rg": "bin/rg" }
+}
+PKGJSON
+    cat > "$target_dir/index.js" <<'IDXJS'
+// Minimal stub of @vscode/ripgrep-linux-x64 for environments where the
+// real platform binary isn't shipped. Wraps the system /usr/bin/rg (or
+// wherever `which rg` points) so @vscode/ripgrep's `require()` call works.
+const path = require('path');
+const rgPath = path.join(__dirname, 'bin', 'rg');
+module.exports = { path: rgPath };
+module.exports.default = module.exports;
+IDXJS
+    echo "minimax-agent: Staged fallback @vscode/ripgrep-linux-x64 -> $(command -v rg)"
+}
+
+
+ASAR_UNPACKED="/opt/minimax-agent/resources/app.asar.unpacked"
+if [ -d "$ASAR_UNPACKED" ] && [ ! -d "$ASAR_UNPACKED/node_modules/@vscode/ripgrep-linux-x64" ]; then
+    echo "minimax-agent: Back-filling @vscode/ripgrep-linux-x64..."
+    BACKFILL_STAGE="/tmp/minimax-backfill.$$"
+    mkdir -p "$BACKFILL_STAGE"
+    (
+        cd "$BACKFILL_STAGE"
+        printf '{\n  "name": "minimax-backfill",\n  "version": "1.0.0",\n  "private": true,\n  "dependencies": { "@vscode/ripgrep": "*" }\n}\n' > package.json
+        if command -v npm >/dev/null 2>&1; then
+            if npm install --no-audit --no-fund --omit=dev 2>/dev/null; then
+                mkdir -p "$ASAR_UNPACKED/node_modules/@vscode"
+                cp -a node_modules/@vscode/ripgrep-linux-x64 "$ASAR_UNPACKED/node_modules/@vscode/"
+                echo "minimax-agent: Back-filled @vscode/ripgrep-linux-x64 from npm"
+            fi
+        fi
+    )
+    stage_ripgrep_fallback "$ASAR_UNPACKED/node_modules/@vscode/ripgrep-linux-x64" || echo "minimax-agent: fallback stage failed"
+    unset BACKFILL_STAGE
+fi
+# ─────────────────────────── helpers ───────────────────────────
+_log() { echo "minimax-agent: $*"; }
+
+refresh_xdg_caches() {
+    if [ -x /usr/bin/update-desktop-database ]; then
+        update-desktop-database /usr/share/applications/ 2>/dev/null || true
+    fi
+    if [ -x /usr/bin/gtk-update-icon-cache ]; then
+        gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+    if [ -x /usr/bin/xdg-icon-resource ]; then
+        xdg-icon-resource forceupdate --theme hicolor 2>/dev/null || true
+    fi
+}
+
+register_protocol_handlers() {
+    if ! command -v xdg-mime >/dev/null 2>&1; then
+        return 0
+    fi
+    for scheme in ${SCHEMES}; do
+        xdg-mime default "${DESKTOP_FILE}" "x-scheme-handler/${scheme}" 2>/dev/null || true
+    done
+    if command -v gio >/dev/null 2>&1; then
+        for scheme in ${SCHEMES}; do
+            gio mime "x-scheme-handler/${scheme}" "${DESKTOP_FILE}" 2>/dev/null || true
+        done
+    fi
+}
+
+# Iterate over real (human) accounts on the system. We mirror the
+# .deb's getent passwd | awk filter, but with a pacman-friendly
+# fallback when getent is unavailable (busybox, minimal Cachy OS
+# container, etc.).
+for_each_human_user() {
+    local cb="$1"
+    local user home uid shell
+    if command -v getent >/dev/null 2>&1; then
+        getent passwd 2>/dev/null | awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /nologin|false/ {print $1":"$6":"$3}' | \
+            while IFS=: read -r user home uid; do
+                [ -n "${user}" ] && [ -n "${home}" ] && [ -d "${home}" ] && "${cb}" "${user}" "${home}"
+            done
+    else
+        # Fallback: parse /etc/passwd directly
+        awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /nologin|false/ {print $1":"$6":"$3}' /etc/passwd | \
+            while IFS=: read -r user home uid; do
+                [ -n "${user}" ] && [ -n "${home}" ] && [ -d "${home}" ] && "${cb}" "${user}" "${home}"
+            done
+    fi
+}
+
+prepare_user_dirs() {
+    prepare_one() {
+        local user="$1"
+        local home="$2"
+        # Fix a broken symlink left behind by a previous install
+        if [ -L "${home}/.mavis" ] && [ ! -e "${home}/.mavis" ]; then
+            rm -f "${home}/.mavis" 2>/dev/null || true
+        fi
+        # Pre-create daemon data dirs so the user service can write to
+        # them on first run without crashing on EACCES.
+        install -dm755 -o "${user}" -g "${user}" \
+            "${home}/.mavis/logs" \
+            "${home}/.mavis/screenshots" 2>/dev/null || \
+            mkdir -p "${home}/.mavis/logs" "${home}/.mavis/screenshots" 2>/dev/null || true
+        # chown if we created the dirs as root
+        chown "${user}:${user}" "${home}/.mavis" 2>/dev/null || true
+        chown -R "${user}:${user}" "${home}/.mavis/logs" "${home}/.mavis/screenshots" 2>/dev/null || true
+    }
+    for_each_human_user prepare_one
+}
+
+enable_user_linger() {
+    if ! command -v loginctl >/dev/null 2>&1; then
+        return 0
+    fi
+    # Only enable linger when systemd is actually PID 1 — the .deb
+    # does the same check.
+    if [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then
+        return 0
+    fi
+    enable_linger_one() {
+        local user="$1"
+        loginctl enable-linger "${user}" 2>/dev/null || true
+    }
+    for_each_human_user enable_linger_one
+}
+
+# Verify and rebuild native modules (better-sqlite3, etc.) for the
+# currently-installed Node.js, if it is recent enough.
+rebuild_native_modules() {
+    if [ ! -d "${DAEMON_DIR}/node_modules" ]; then
+        return 0
+    fi
+    if ! command -v node >/dev/null 2>&1; then
+        _log "Node.js not found; skipping native module rebuild."
+        _log "  Install Node.js >= 18, then run:"
+        _log "    cd ${DAEMON_DIR} && npm rebuild"
+        return 0
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        _log "npm not found; cannot rebuild native modules."
+        return 0
+    fi
+    local needs_rebuild=0
+    node -e "require('better-sqlite3')" 2>/dev/null || needs_rebuild=1
+    node -e "require('fs-native-extensions')" 2>/dev/null || needs_rebuild=1
+    if [ "${needs_rebuild}" -eq 1 ]; then
+        _log "Rebuilding native modules for $(node --version)..."
+        (cd "${DAEMON_DIR}" && npm rebuild 2>&1) && \
+            _log "Native modules rebuilt." || \
+            _log "WARNING: npm rebuild failed. Run: cd ${DAEMON_DIR} && npm rebuild"
+    fi
+}
+
+# ─────────────────────────── entry points ───────────────────────────
+post_install() {
+    _log "Installing (Arch/Cachy OS)..."
+
+    # chrome-sandbox setuid — defense in depth even though we run
+    # with --no-sandbox in the launcher for now
+    if [ -f "${APP_DIR}/chrome-sandbox" ]; then
+        chmod 4755 "${APP_DIR}/chrome-sandbox" 2>/dev/null || true
+    fi
+    if [ -d "${APP_DIR}/resources/resources/opencode" ]; then
+        find "${APP_DIR}/resources/resources/opencode" -type f -exec chmod 755 {} \; 2>/dev/null || true
+    fi
+
+    refresh_xdg_caches
+    register_protocol_handlers
+    prepare_user_dirs
+    enable_user_linger
+    rebuild_native_modules
+
+    # Cachy OS hint
+    if [ -f /etc/cachyos-release ] || [ -f /usr/lib/os-release ] && grep -qi 'cachyos' /usr/lib/os-release 2>/dev/null; then
+        _log "Cachy OS detected — recommend: sudo pacman -S cachyos-ananicy-rules cachyos-package-manager"
+    fi
+
+    _log "Done. Launch with: minimax-agent"
+    _log "  Logs: ~/.mavis/logs/  Service: systemctl --user status mavis.service"
+}
+
+post_upgrade() {
+    _log "Upgrading (Arch/Cachy OS)..."
+
+    # Re-apply setuid bit, in case the new payload lacks it
+    if [ -f "${APP_DIR}/chrome-sandbox" ]; then
+        chmod 4755 "${APP_DIR}/chrome-sandbox" 2>/dev/null || true
+    fi
+    refresh_xdg_caches
+    register_protocol_handlers
+    rebuild_native_modules
+
+    _log "Upgrade complete. Restart the app to pick up the new payload."
+}
+
+pre_remove() {
+    _log "Uninstalling (Arch/Cachy OS)..."
+
+    # Remove per-user systemd unit files, mirroring the .deb's prerm
+    remove_unit_one() {
+        local user="$1"
+        local home="$2"
+        local unit="${home}/.config/systemd/user/mavis.service"
+        if [ -f "${unit}" ]; then
+            rm -f "${unit}" 2>/dev/null || true
+            if command -v su >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
+                su -s /bin/bash "${user}" -c "XDG_RUNTIME_DIR=/run/user/\$(id -u ${user}) systemctl --user daemon-reload 2>/dev/null" || true
+            fi
+        fi
+    }
+    for_each_human_user remove_unit_one
+    _log "Per-user systemd units removed."
+    _log "User data left intact (config under ~/.mavis, ~/.config/minimax-agent). Remove manually if desired."
+}

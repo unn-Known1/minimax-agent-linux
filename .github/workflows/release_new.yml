@@ -45,22 +45,22 @@ jobs:
         run: |
           CURRENT_VERSION="${{ steps.current.outputs.current_version }}"
           echo "Checking for versions newer than $CURRENT_VERSION..."
-          
+
           # Parse current version
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
+
           # Check next 20 patch versions
           LATEST_VERSION=""
           LATEST_URL=""
-          
+
           for i in $(seq 1 20); do
             TEST_PATCH=$((PATCH + i))
             TEST_VERSION="${MAJOR}.${MINOR}.${TEST_PATCH}"
             TEST_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${TEST_VERSION}.exe"
-            
+
             echo "Checking $TEST_VERSION..."
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --head "$TEST_URL" --max-time 10 || echo "000")
-            
+
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Found new version: $TEST_VERSION"
               LATEST_VERSION=$TEST_VERSION
@@ -71,7 +71,7 @@ jobs:
               echo "Version $TEST_VERSION check failed (HTTP $HTTP_CODE)"
             fi
           done
-          
+
           if [ -n "$LATEST_VERSION" ]; then
             echo "New version detected: $LATEST_VERSION"
             echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
@@ -84,6 +84,7 @@ jobs:
             echo "should_build=false" >> $GITHUB_OUTPUT
           fi
 
+  # ─────────────────────────── .deb build ───────────────────────────
   build-deb:
     name: Build .deb Package
     needs: check-release
@@ -124,7 +125,7 @@ jobs:
       - name: Download Windows release
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXE_URL="${{ github.event.inputs.exe_url }}"
             if [ -z "$EXE_URL" ]; then
@@ -133,19 +134,19 @@ jobs:
           else
             EXE_URL="${{ needs.check-release.outputs.exe_url }}"
           fi
-          
+
           mkdir -p /tmp/minimax-extract
           cd /tmp/minimax-extract
-          
+
           echo "Downloading from: $EXE_URL"
           curl -fsSL -o "MiniMax Code Setup ${VERSION}.exe" "$EXE_URL"
-          
+
           FILE_SIZE=$(stat -c%s "MiniMax Code Setup ${VERSION}.exe")
           if [ "$FILE_SIZE" -lt 50000000 ]; then
             echo "Downloaded file too small ($FILE_SIZE bytes)"
             exit 1
           fi
-          
+
           echo "Downloaded successfully: $FILE_SIZE bytes"
 
       - name: Extract NSIS installer
@@ -160,8 +161,9 @@ jobs:
       - name: Update version references
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          sed -i "s/VERSION=\".*\"/VERSION=\"${VERSION}\"/" build.sh
-          sed -i "s/VERSION=\".*\"/VERSION=\"${VERSION}\"/" setup.sh
+          sed -i "s/^VERSION=\".*\"/VERSION=\"${VERSION}\"/" build.sh
+          sed -i "s/^VERSION=\".*\"/VERSION=\"${VERSION}\"/" setup.sh
+          sed -i "s/^ELECTRON_VERSION=\".*\"/ELECTRON_VERSION=\"33.2.0\"/" setup.sh
           sed -i "s/VERSION=\".*\"/VERSION=\"${VERSION}\"/" releases/download.sh
           sed -i "s|GITHUB_URL=.*|GITHUB_URL=\"https://github.com/unn-Known1/minimax-agent-linux/releases/download/v${VERSION}/minimax-agent_${VERSION}_amd64.deb\"|" releases/download.sh
           sed -i "s/Version: .*/Version: ${VERSION}/" linux-build/DEBIAN/control
@@ -171,31 +173,38 @@ jobs:
           sed -i "s|minimax-agent_[0-9.]\+_amd64.deb|minimax-agent_${VERSION}_amd64.deb|g" README.md
           sed -i "s|minimax-agent_[0-9.]\+_amd64.deb|minimax-agent_${VERSION}_amd64.deb|g" INSTALL.md
           sed -i "s|minimax-agent_[0-9.]\+_amd64.deb|minimax-agent_${VERSION}_amd64.deb|g" CONTRIBUTING.md
+          # Cachy OS / Arch PKGBUILD version bump
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" cachyos/PKGBUILD
+          # Reset pkgrel to 1 for new upstream version
+          sed -i "s/^pkgrel=.*/pkgrel=1/" cachyos/PKGBUILD
+          # Update the source URL in .SRCINFO
+          sed -i "s|minimax-agent-linux-[0-9.]\+\.tar\.gz|minimax-agent-linux-${VERSION}.tar.gz|g" cachyos/.SRCINFO
+          sed -i "s|https://github.com/unn-Known1/minimax-agent-linux/archive/refs/tags/v[0-9.]\+\.tar\.gz|https://github.com/unn-Known1/minimax-agent-linux/archive/refs/tags/v${VERSION}.tar.gz|g" cachyos/.SRCINFO
 
       - name: Copy resources from Windows release
         run: |
           cp /tmp/minimax-extract/app-64/resources/app.asar \
              linux-build/opt/minimax-agent/resources/app.asar
-          
+
           rm -rf linux-build/opt/minimax-agent/resources/app.asar.unpacked
           cp -r /tmp/minimax-extract/app-64/resources/app.asar.unpacked \
                 linux-build/opt/minimax-agent/resources/app.asar.unpacked
-          
+
           cp /tmp/minimax-extract/app-64/resources/app-update.yml \
              linux-build/opt/minimax-agent/resources/app-update.yml
-          
+
           cp /tmp/minimax-extract/app-64/resources/resources/icon.ico \
              linux-build/opt/minimax-agent/resources/resources/icon.ico
-          
+
           cp /tmp/minimax-extract/app-64/resources/resources/tray.ico \
              linux-build/opt/minimax-agent/resources/resources/tray.ico
-          
+
           cp /tmp/minimax-extract/app-64/resources/resources/tray.png \
              linux-build/opt/minimax-agent/resources/resources/tray.png
-          
+
           cp /tmp/minimax-extract/app-64/resources/resources/trayTemplate@2x.png \
              linux-build/opt/minimax-agent/resources/resources/trayTemplate@2x.png
-          
+
           cp /tmp/minimax-extract/app-64/resources/resources/trayTemplate.png \
              linux-build/opt/minimax-agent/resources/resources/trayTemplate.png
 
@@ -213,12 +222,6 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           cp output/minimax-agent_${VERSION}_amd64.deb releases/
 
-      - name: Upload .deb artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: minimax-agent-deb
-          path: output/minimax-agent_${{ steps.version.outputs.version }}_amd64.deb
-
       - name: Commit version changes
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -231,20 +234,211 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minimax-agent-deb
+          path: output/minimax-agent_${{ steps.version.outputs.version }}_amd64.deb
+
+  # ─────────────────── Cachy OS / Arch build (new) ───────────────────
+  build-cachyos:
+    name: Build Cachy OS / Arch Package
+    needs: check-release
+    if: needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ needs.check-release.outputs.new_version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # Pull the windows-extracted app.asar / app.asar.unpacked / icons
+      # from build-deb's artifact, so this job doesn't have to
+      # re-download the Windows installer.
+      - name: Download Windows release
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p /tmp/minimax-extract
+          cd /tmp/minimax-extract
+          EXE_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${VERSION}.exe"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.exe_url }}" ]; then
+            EXE_URL="${{ github.event.inputs.exe_url }}"
+          fi
+          echo "Downloading from: $EXE_URL"
+          curl -fsSL -o "MiniMax Code Setup ${VERSION}.exe" "$EXE_URL"
+          FILE_SIZE=$(stat -c%s "MiniMax Code Setup ${VERSION}.exe")
+          if [ "$FILE_SIZE" -lt 50000000 ]; then
+            echo "Downloaded file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+
+      - name: Extract NSIS installer
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd /tmp/minimax-extract
+          mkdir -p extracted
+          7z x -oextracted "MiniMax Code Setup ${VERSION}.exe"
+          mkdir -p app-64
+          7z x -oapp-64 extracted/\$PLUGINSDIR/app-64.7z
+
+      - name: Stage linux-build resources for PKGBUILD
+        run: |
+          # We can't run the .deb's build.sh here (no dpkg-deb), but
+          # we DO need the fresh app.asar + native modules + icons
+          # in linux-build/. Copy them straight from the Windows
+          # extract — exactly the same step build-deb does.
+          cp /tmp/minimax-extract/app-64/resources/app.asar \
+             linux-build/opt/minimax-agent/resources/app.asar
+          rm -rf linux-build/opt/minimax-agent/resources/app.asar.unpacked
+          cp -r /tmp/minimax-extract/app-64/resources/app.asar.unpacked \
+                linux-build/opt/minimax-agent/resources/app.asar.unpacked
+          cp /tmp/minimax-extract/app-64/resources/app-update.yml \
+             linux-build/opt/minimax-agent/resources/app-update.yml
+          cp /tmp/minimax-extract/app-64/resources/resources/icon.ico \
+             linux-build/opt/minimax-agent/resources/resources/icon.ico
+          cp /tmp/minimax-extract/app-64/resources/resources/tray.ico \
+             linux-build/opt/minimax-agent/resources/resources/tray.ico
+          cp /tmp/minimax-extract/app-64/resources/resources/tray.png \
+             linux-build/opt/minimax-agent/resources/resources/tray.png
+          cp /tmp/minimax-extract/app-64/resources/resources/trayTemplate@2x.png \
+             linux-build/opt/minimax-agent/resources/resources/trayTemplate@2x.png
+          cp /tmp/minimax-extract/app-64/resources/resources/trayTemplate.png \
+             linux-build/opt/minimax-agent/resources/resources/trayTemplate.png
+
+      - name: Bump PKGBUILD version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" cachyos/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" cachyos/PKGBUILD
+
+      - name: Build Cachy OS package (Docker archlinux)
+        run: |
+          chmod +x build-cachyos.sh
+          ./build-cachyos.sh --docker
+        env:
+          # Force x86-64-v3 CFLAGS in the makepkg invocation, matching
+          # Cachy OS's default optimization level.
+          CACHYOS_V3: "1"
+
+      - name: Verify .pkg.tar.zst
+        run: |
+          ls -la releases/*.pkg.tar.zst
+          PKG=$(ls -t releases/*.pkg.tar.zst | head -1)
+          echo "Built: $PKG"
+          # Basic integrity check (zstd is bundled in archlinux docker image)
+          zstd -t "$PKG" || (echo "zstd not in PATH; using tar fallback" && tar -tf "$PKG" > /dev/null)
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd releases
+          sha256sum minimax-agent-*.pkg.tar.zst minimax-agent-*.deb 2>/dev/null > SHA256SUMS || \
+            sha256sum minimax-agent-*.pkg.tar.zst > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload Cachy OS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minimax-agent-pkg
+          path: |
+            releases/*.pkg.tar.zst
+            releases/SHA256SUMS
+
+  # ──────────────────────── Combined release ────────────────────────
+  release:
+    name: Create GitHub Release with .deb + .pkg.tar.zst
+    needs: [build-deb, build-cachyos]
+    if: always() && (needs.build-deb.result == 'success' || needs.build-cachyos.result == 'success') && (needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download .deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: minimax-agent-deb
+          path: /tmp/release/deb
+        continue-on-error: true
+
+      - name: Download Cachy OS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: minimax-agent-pkg
+          path: /tmp/release/pkg
+        continue-on-error: true
+
+      - name: Prepare release payload
+        id: prepare
+        run: |
+          mkdir -p /tmp/release/payload
+          if [ -d /tmp/release/deb ]; then
+            cp /tmp/release/deb/*.deb /tmp/release/payload/ 2>/dev/null || true
+          fi
+          if [ -d /tmp/release/pkg ]; then
+            cp /tmp/release/pkg/*.pkg.tar.zst /tmp/release/payload/ 2>/dev/null || true
+            cp /tmp/release/pkg/SHA256SUMS /tmp/release/payload/ 2>/dev/null || true
+          fi
+          echo "Release payload:"
+          ls -la /tmp/release/payload/
+          if [ -z "$(ls -A /tmp/release/payload/ 2>/dev/null)" ]; then
+            echo "ERROR: no artifacts to release"
+            exit 1
+          fi
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ needs.check-release.outputs.new_version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
-          body: "Release v${{ steps.version.outputs.version }} - Updated from Windows ${{ steps.version.outputs.version }}"
+          body: |
+            Release v${{ steps.version.outputs.version }} - Updated from Windows ${{ steps.version.outputs.version }}
+
+            ## Assets
+
+            - **minimax-agent_${{ steps.version.outputs.version }}_amd64.deb** — for Debian / Ubuntu / Linux Mint
+              ```
+              sudo dpkg -i minimax-agent_${{ steps.version.outputs.version }}_amd64.deb
+              sudo apt --fix-broken install
+              sudo ./setup.sh
+              minimax-agent
+              ```
+            - **minimax-agent-${{ steps.version.outputs.version }}-1-x86_64.pkg.tar.zst** — for Cachy OS / Arch / Manjaro / EndeavourOS
+              ```
+              # One-liner
+              curl -fsSL https://raw.githubusercontent.com/unn-Known1/minimax-agent-linux/main/releases/download-cachyos.sh | sudo bash
+
+              # Or manual
+              sudo pacman -U minimax-agent-${{ steps.version.outputs.version }}-1-x86_64.pkg.tar.zst
+              minimax-agent
+              ```
+
+            See [INSTALL.md](https://github.com/unn-Known1/minimax-agent-linux/blob/main/INSTALL.md) for full instructions.
           files: |
-            releases/minimax-agent_${{ steps.version.outputs.version }}_amd64.deb
+            /tmp/release/payload/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   notify-failure:
     name: Create Failure Issue
-    needs: [build-deb]
+    needs: [build-deb, build-cachyos]
     if: failure() && (needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
@@ -256,10 +450,17 @@ jobs:
             const runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}";
             const runId = "${{ github.run_id }}";
             const eventName = "${{ github.event_name }}";
-            
+
             let triggerType = 'Scheduled check';
             if (eventName === 'workflow_dispatch') triggerType = 'Manual dispatch';
-            
+
+            // Determine which jobs failed
+            const debResult = "${{ needs.build-deb.result }}";
+            const cachyosResult = "${{ needs.build-cachyos.result }}";
+            const failedJobs = [];
+            if (debResult === 'failure') failedJobs.push('.deb build (Debian/Ubuntu)');
+            if (cachyosResult === 'failure') failedJobs.push('.pkg.tar.zst build (Cachy OS / Arch)');
+
             const title = `Build failed for MiniMax Agent Linux v${version}`;
             const body = [
               '## Build Failure Report',
@@ -268,6 +469,9 @@ jobs:
               `**Workflow Run:** [#${runId}](${runUrl})`,
               `**Triggered by:** ${triggerType}`,
               `**Timestamp:** ${new Date().toISOString()}`,
+              '',
+              '### Failed Jobs',
+              failedJobs.length ? failedJobs.map(j => `- ${j}`).join('\n') : '- (no job-level failures reported, but the workflow failed)',
               '',
               '### Error Details',
               `The automated build for MiniMax Agent Linux v${version} failed. Please check the workflow logs for details.`,
@@ -284,6 +488,7 @@ jobs:
               '- Version mismatch in extracted files',
               '- Native module rebuild failures (better-sqlite3, node-pty, etc.)',
               '- Disk space or memory constraints on runner',
+              '- For Cachy OS job: Docker archlinux:latest image not reachable',
               '',
               '---',
               '*This issue was created automatically by the GitHub Actions workflow.'
@@ -293,7 +498,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: ['build-failure', 'automated', \`v${version}\`]
+              labels: ['build-failure', 'automated', `v${version}`]
             });
 
             if (existingIssues.data.length > 0) {
@@ -306,6 +511,5 @@ jobs:
               repo: context.repo.repo,
               title: title,
               body: body,
-              labels: ['build-failure', 'automated', \`v${version}\`]
+              labels: ['build-failure', 'automated', `v${version}`]
             });
-

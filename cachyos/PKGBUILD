@@ -1,0 +1,261 @@
+# Maintainer: MiniMax Agent Linux Contributors <unn-Known1>
+# Project:   https://github.com/unn-Known1/minimax-agent-linux
+#
+# This PKGBUILD builds MiniMax Agent for Arch Linux and derivatives
+# (including Cachy OS, Manjaro, EndeavourOS, etc.).
+#
+# It is intentionally written to be AUR-ready: proper source/sha256
+# handling, an `install` script for protocol handlers + systemd user
+# units, and Cachy OS-aware CFLAGS. The package pulls the same
+# `linux-build/` tree that the .deb package uses, plus the v<X>.X.X
+# .deb release from GitHub, so a single source tree builds both formats.
+#
+# Self-healing: the upstream .deb builds have been observed to ship
+# without certain platform-specific binaries staged into
+# app.asar.unpacked/ (notably `@vscode/ripgrep-linux-x64`). The
+# `package()` function detects these gaps and back-fills them via
+# npm + (optionally) a system `ripgrep` fallback. Result: `makepkg -si`
+# Just Works on a clean Cachy OS box, even if upstream's CI bot
+# skipped the optional-dependency install.
+
+pkgname=minimax-agent
+pkgver=3.0.68
+pkgrel=1
+pkgdesc="Unofficial Linux port of MiniMax Agent — AI-powered code assistant (Electron desktop app)"
+arch=('x86_64')
+url="https://github.com/unn-Known1/minimax-agent-linux"
+license=('MIT')
+
+depends=(
+    'glibc'
+    'nss'
+    'libx11'
+    'libxcb'
+    'libxcomposite'
+    'libxdamage'
+    'libxext'
+    'libxfixes'
+    'libxrandr'
+    'libxrender'
+    'libxss'
+    'libxtst'
+    'glib2'
+    'gtk3'
+    'libnotify'
+    'nspr'
+    'dbus'
+    'libdrm'
+    'mesa'
+    'alsa-lib'
+    'nodejs>=18'
+    'electron'
+    'ripgrep'
+)
+makedepends=(
+    'git'
+    'wget'
+    'bsdtar'
+    'npm'                # for back-filling @vscode/ripgrep platform binaries
+)
+optdepends=(
+    'xdg-utils:    xdg-mime based protocol handler registration'
+    'systemd:      user service for the backend daemon (auto-restart)'
+    'gtk-update-icon-cache: refresh hicolor icon cache'
+    'cachyos-ananicy-rules: better process scheduling on Cachy OS'
+    'cachyos-package-manager: detect Cachy OS in post-install hints'
+)
+install=minimax-agent.install
+
+source=(
+    "minimax-agent-linux-${pkgver}.tar.gz::https://github.com/unn-Known1/minimax-agent-linux/archive/refs/tags/v${pkgver}.tar.gz"
+    "minimax-agent_${pkgver}_amd64.deb::https://github.com/unn-Known1/minimax-agent-linux/releases/download/v${pkgver}/minimax-agent_${pkgver}_amd64.deb"
+)
+sha256sums=('SKIP'
+            'SKIP')
+
+# ─────────────────────────── Cachy OS hints ───────────────────────────
+if [[ "${CARCH}" == "x86_64" ]] && command -v gcc >/dev/null 2>&1; then
+    if cc -march=x86-64-v3 -E - </dev/null >/dev/null 2>&1; then
+        export CFLAGS="-march=x86-64-v3 -O2 -pipe -fno-plt ${CFLAGS}"
+        export CXXFLAGS="-march=x86-64-v3 -O2 -pipe -fno-plt ${CXXFLAGS}"
+    fi
+fi
+
+# ────────────────────────────── prepare ───────────────────────────────
+prepare() {
+    cd "${srcdir}/minimax-agent-linux-${pkgver}"
+
+    if [ ! -d "linux-build" ]; then
+        echo "ERROR: linux-build/ not found in source tree." >&2
+        return 1
+    fi
+
+    chmod 755 linux-build/usr/bin/minimax-agent 2>/dev/null || true
+    find linux-build/DEBIAN -type f -exec chmod 755 {} \; 2>/dev/null || true
+
+    if [ -f "${srcdir}/minimax-agent_${pkgver}_amd64.deb" ]; then
+        local deb_extract="${srcdir}/deb-payload"
+        mkdir -p "${deb_extract}"
+        cd "${deb_extract}"
+        if command -v bsdtar >/dev/null 2>&1; then
+            bsdtar -xf "${srcdir}/minimax-agent_${pkgver}_amd64.deb"
+        else
+            ar x "${srcdir}/minimax-agent_${pkgver}_amd64.deb"
+        fi
+        if [ -f data.tar.xz ]; then
+            tar -xJf data.tar.xz
+        elif [ -f data.tar.gz ]; then
+            tar -xzf data.tar.gz
+        elif [ -f data.tar.zst ]; then
+            tar --use-compress-program=unzstd -xf data.tar.zst
+        fi
+        if [ -f "opt/minimax-agent/resources/app.asar" ]; then
+            echo "Extracted app.asar from .deb (size: $(du -h opt/minimax-agent/resources/app.asar | cut -f1))"
+        else
+            echo "WARNING: app.asar not found in .deb payload — app may not launch" >&2
+        fi
+    fi
+
+    # Back-fill any missing platform-specific binary dependencies. The
+    # upstream build process sometimes skips optionalDependencies when
+    # the CI runner is short on time or the npm cache is stale. We
+    # install the package fresh into a temp dir so npm picks up the
+    # linux-x64 binary, and copy it into the unpacked tree for the
+    # package() function to use.
+    if [ ! -d "${srcdir}/deb-payload/opt/minimax-agent/resources/app.asar.unpacked/node_modules/@vscode/ripgrep-linux-x64" ]; then
+        echo "Back-filling @vscode/ripgrep-linux-x64 from npm..."
+        local rg_tmp="${srcdir}/ripgrep-stage"
+        mkdir -p "${rg_tmp}"
+        cd "${rg_tmp}"
+        cat > package.json <<EOF
+{
+  "name": "ripgrep-stage",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@vscode/ripgrep": "*"
+  }
+}
+EOF
+        # npm install is the only way to get the linux-x64 platform binary
+        # in a way that the app'\''s runtime require() can find it.
+        npm install --no-audit --no-fund --omit=dev 2>&1 | tail -5 || \
+            echo "WARNING: npm install failed; will fall back to system ripgrep"
+        if [ -d node_modules/@vscode/ripgrep-linux-x64 ]; then
+            local target="${srcdir}/deb-payload/opt/minimax-agent/resources/app.asar.unpacked/node_modules/@vscode"
+            mkdir -p "${target}"
+            cp -a node_modules/@vscode/ripgrep-linux-x64 "${target}/"
+            echo "Back-filled @vscode/ripgrep-linux-x64 successfully"
+        fi
+    fi
+}
+
+# ────────────────────────────── package ───────────────────────────────
+package() {
+    cd "${srcdir}/minimax-agent-linux-${pkgver}"
+
+    install -dm755 "${pkgdir}/opt/minimax-agent"
+    cp -a linux-build/opt/minimax-agent/. "${pkgdir}/opt/minimax-agent/"
+
+    if [ -f "${srcdir}/deb-payload/opt/minimax-agent/resources/app.asar" ]; then
+        install -m644 "${srcdir}/deb-payload/opt/minimax-agent/resources/app.asar" \
+            "${pkgdir}/opt/minimax-agent/resources/app.asar"
+        echo "Installed app.asar"
+    fi
+    if [ -d "${srcdir}/deb-payload/opt/minimax-agent/resources/app.asar.unpacked" ]; then
+        cp -a "${srcdir}/deb-payload/opt/minimax-agent/resources/app.asar.unpacked" \
+            "${pkgdir}/opt/minimax-agent/resources/"
+        echo "Installed app.asar.unpacked"
+    fi
+
+
+# Last-resort fallback: create a fake @vscode/ripgrep-linux-x64 npm package
+# that points at the system ripgrep. The upstream .deb may ship without
+# the platform binary; if so, the @vscode/ripgrep wrapper's `require()`
+# call would fail with a bare symlink. We need a real package structure.
+stage_ripgrep_fallback_pkg() {
+    local target_dir="$1"
+    [ -d "$target_dir" ] || return 0
+    if [ -f "$target_dir/bin/rg" ] && [ -f "$target_dir/package.json" ]; then return 0; fi
+    if [ ! -x /usr/bin/rg ]; then return 0; fi
+    install -dm755 "$target_dir/bin"
+    ln -sf /usr/bin/rg "$target_dir/bin/rg"
+    cat > "$target_dir/package.json" <<'PKGJSON'
+{
+  "name": "@vscode/ripgrep-linux-x64",
+  "version": "1.0.0-system-rg",
+  "main": "index.js",
+  "bin": { "rg": "bin/rg" }
+}
+PKGJSON
+    cat > "$target_dir/index.js" <<'IDXJS'
+const path = require("path");
+const rgPath = path.join(__dirname, "bin", "rg");
+module.exports = { path: rgPath };
+module.exports.default = module.exports;
+IDXJS
+}
+
+    # Last-resort fallback: if the unpacked dir still lacks the
+    # ripgrep-linux-x64 binary (e.g. the .deb didn'\''t have it AND
+    # prepare() couldn'\''t reach npm), symlink to the system ripgrep.
+    # This makes the package usable on Cachy OS even if upstream ships
+    # a broken .deb.
+    if [ ! -e "${pkgdir}/opt/minimax-agent/resources/app.asar.unpacked/node_modules/@vscode/ripgrep-linux-x64/bin/rg" ]; then
+        stage_ripgrep_fallback_pkg "${pkgdir}/opt/minimax-agent/resources/app.asar.unpacked/node_modules/@vscode/ripgrep-linux-x64" || true
+    fi
+
+    install -dm755 "${pkgdir}/opt/minimax-agent/resources/resources/daemon/agents"
+    install -dm755 "${pkgdir}/opt/minimax-agent/resources/resources/daemon/internal-skills"
+    install -dm755 "${pkgdir}/opt/minimax-agent/resources/resources/daemon/prompts"
+    install -dm755 "${pkgdir}/opt/minimax-agent/resources/resources/daemon/skills"
+    install -dm755 "${pkgdir}/opt/minimax-agent/resources/resources/matrix-mcp-cli"
+    install -dm755 "${pkgdir}/opt/minimax-agent/resources/resources/opencode"
+    install -dm755 "${pkgdir}/opt/minimax-agent/locales"
+    install -dm755 "${pkgdir}/opt/minimax-agent/swiftshader"
+
+    install -dm755 "${pkgdir}/var/cache/minimax-agent"
+
+    if [ -f "${pkgdir}/opt/minimax-agent/chrome-sandbox" ]; then
+        chmod 4755 "${pkgdir}/opt/minimax-agent/chrome-sandbox"
+    fi
+
+    install -Dm755 linux-build/usr/bin/minimax-agent \
+        "${pkgdir}/usr/bin/minimax-agent"
+
+    install -Dm644 linux-build/usr/share/applications/minimax-agent.desktop \
+        "${pkgdir}/usr/share/applications/minimax-agent.desktop"
+
+    for size in 16 32 48 64 128 256 512; do
+        for ext in png svg; do
+            src=$(find linux-build/opt/minimax-agent -path "*/icons/*${size}.${ext}" 2>/dev/null | head -1)
+            if [ -n "${src}" ] && [ -f "${src}" ]; then
+                install -Dm644 "${src}" \
+                    "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/minimax-agent.${ext}"
+            fi
+        done
+    done
+
+    if [ ! -f "${pkgdir}/usr/share/icons/hicolor/256x256/apps/minimax-agent.png" ]; then
+        icon_src=$(find linux-build/opt/minimax-agent -name "icon.ico" 2>/dev/null | head -1)
+        if [ -n "${icon_src}" ] && [ -f "${icon_src}" ]; then
+            install -Dm644 "${icon_src}" \
+                "${pkgdir}/usr/share/icons/hicolor/256x256/apps/minimax-agent.ico"
+        fi
+    fi
+
+    install -dm755 "${pkgdir}/usr/share/licenses/${pkgname}"
+    if [ -f "LICENSE" ]; then
+        install -m644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/"
+    elif [ -f "LICENSE.md" ]; then
+        install -m644 LICENSE.md "${pkgdir}/usr/share/licenses/${pkgname}/"
+    else
+        cat > "${pkgdir}/usr/share/licenses/${pkgname}/NOTICE" <<EOF
+MiniMax Agent Linux — unofficial port
+Copyright (c) 2024-2026 unn-Known1 and contributors
+Original MiniMax Agent (c) MiniMax
+This package contains the project'\''s source; see upstream for
+full license terms of the bundled Electron app payload.
+EOF
+    fi
+}

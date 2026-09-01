@@ -303,7 +303,7 @@ The following native modules are bundled in `app.asar.unpacked`:
 
 ## Electron Version
 
-The build targets Electron `v33.2.0`. The `setup.sh` script (Debian) downloads this runtime during installation. The Cachy OS package does the same — the `package()` function only stages the directory; the Electron binary is downloaded by the user with `setup.sh` if they want, or kept as a downloaded-from-network runtime that the package itself sets up via the install hook.
+The build targets Electron `v35.7.0`. The `setup.sh` script (Debian) downloads this runtime during installation. The Cachy OS package does the same — the `package()` function only stages the directory; the Electron binary is downloaded by the user with `setup.sh` if they want, or kept as a downloaded-from-network runtime that the package itself sets up via the install hook.
 
 > Note: bundling Electron directly into the `.pkg.tar.zst` is a deliberate trade-off. A future improvement is to switch to depending on the system `electron` package (Arch has it), which would shrink the package significantly. Track this in the project issues.
 

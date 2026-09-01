@@ -4,69 +4,18 @@ set -e
 case "$1" in
     configure)
 
-        # Backfill @vscode/ripgrep-linux-x64 if missing from app.asar.unpacked.
-        # The upstream build sometimes ships a .deb without it; the app crashes
-        # on startup without this binary. Backfill from npm or fall back to
-        # the system ripgrep package.
-        # Stage a fallback @vscode/ripgrep-linux-x64 package that points at the
-# system ripgrep. The .deb from upstream often ships without the platform
-# binary; npm install of the real package sometimes fails offline. In
-# either case, the @vscode/ripgrep wrapper requires the platform package
-# to be resolvable via `require()`, so a bare symlink to /usr/bin/rg
-# is not enough — we need the full directory structure with package.json
-# and index.js exporting the binary path.
-stage_ripgrep_fallback() {
-    local target_dir="$1"
-    if [ -d "$target_dir" ] && [ -f "$target_dir/bin/rg" ] && [ -f "$target_dir/package.json" ]; then
-        return 0  # already complete
-    fi
-    if ! command -v rg >/dev/null 2>&1; then
-        echo "minimax-agent: WARNING - system ripgrep not found; install ripgrep package" >&2
-        return 1
-    fi
-    mkdir -p "$target_dir/bin"
-    ln -sf "$(command -v rg)" "$target_dir/bin/rg"
-    cat > "$target_dir/package.json" <<'PKGJSON'
-{
-  "name": "@vscode/ripgrep-linux-x64",
-  "version": "1.0.0-system-rg",
-  "description": "System ripgrep wrapper for @vscode/ripgrep on Cachy OS / Arch",
-  "main": "index.js",
-  "bin": { "rg": "bin/rg" }
-}
-PKGJSON
-    cat > "$target_dir/index.js" <<'IDXJS'
-// Minimal stub of @vscode/ripgrep-linux-x64 for environments where the
-// real platform binary isn't shipped. Wraps the system /usr/bin/rg (or
-// wherever `which rg` points) so @vscode/ripgrep's `require()` call works.
-const path = require('path');
-const rgPath = path.join(__dirname, 'bin', 'rg');
-module.exports = { path: rgPath };
-module.exports.default = module.exports;
-IDXJS
-    echo "minimax-agent: Staged fallback @vscode/ripgrep-linux-x64 -> $(command -v rg)"
-}
+        # Defensive: warn if this .deb was built without ripgrep-linux-x64 in app.asar.
+        # Build.sh now injects the package directly into the asar; this check exists
+        # for older .debs installed after an in-place upgrade or from an unfixed mirror.
+        if [ -f /opt/minimax-agent/resources/app.asar ] && \
+           ! npx --yes @electron/asar list /opt/minimax-agent/resources/app.asar 2>/dev/null \
+                | grep -q '^/node_modules/@vscode/ripgrep-linux-x64/'; then
+            echo "minimax-agent: WARNING - this .deb was built without @vscode/ripgrep-linux-x64 in app.asar." >&2
+            echo "minimax-agent:   The app will crash on launch with 'Could not find @vscode/ripgrep-linux-x64'." >&2
+            echo "minimax-agent:   Please upgrade to a release that includes the fix." >&2
+        fi
 
-
-ASAR_UNPACKED="/opt/minimax-agent/resources/app.asar.unpacked"
-        if [ -d "$ASAR_UNPACKED" ] && [ ! -d "$ASAR_UNPACKED/node_modules/@vscode/ripgrep-linux-x64" ]; then
-            echo "minimax-agent: Back-filling @vscode/ripgrep-linux-x64..."
-            BACKFILL_STAGE="/tmp/minimax-backfill.$$"
-            mkdir -p "$BACKFILL_STAGE"
-            (
-                cd "$BACKFILL_STAGE"
-                printf '{\n  "name": "minimax-backfill",\n  "version": "1.0.0",\n  "private": true,\n  "dependencies": { "@vscode/ripgrep": "*" }\n}\n' > package.json
-                if command -v npm >/dev/null 2>&1; then
-                    if npm install --no-audit --no-fund --omit=dev 2>/dev/null; then
-                        mkdir -p "$ASAR_UNPACKED/node_modules/@vscode"
-                        cp -a node_modules/@vscode/ripgrep-linux-x64 "$ASAR_UNPACKED/node_modules/@vscode/"
-                        echo "minimax-agent: Back-filled @vscode/ripgrep-linux-x64 from npm"
-                    fi
-                fi
-            )
-            stage_ripgrep_fallback "$ASAR_UNPACKED/node_modules/@vscode/ripgrep-linux-x64" || true
-            unset BACKFILL_STAGE
-        fi        # ── Desktop integration ──
+        # ── Desktop integration ──
         if [ -x /usr/bin/update-desktop-database ]; then
             /usr/bin/update-desktop-database /usr/share/applications/ 2>/dev/null || true
         fi

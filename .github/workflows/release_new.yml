@@ -163,7 +163,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           sed -i "s/^VERSION=\".*\"/VERSION=\"${VERSION}\"/" build.sh
           sed -i "s/^VERSION=\".*\"/VERSION=\"${VERSION}\"/" setup.sh
-          sed -i "s/^ELECTRON_VERSION=\".*\"/ELECTRON_VERSION=\"33.2.0\"/" setup.sh
+          sed -i "s/^ELECTRON_VERSION=\".*\"/ELECTRON_VERSION=\"35.7.0\"/" setup.sh
           sed -i "s/VERSION=\".*\"/VERSION=\"${VERSION}\"/" releases/download.sh
           sed -i "s|GITHUB_URL=.*|GITHUB_URL=\"https://github.com/unn-Known1/minimax-agent-linux/releases/download/v${VERSION}/minimax-agent_${VERSION}_amd64.deb\"|" releases/download.sh
           sed -i "s/Version: .*/Version: ${VERSION}/" linux-build/DEBIAN/control
@@ -210,6 +210,20 @@ jobs:
 
       - name: Build .deb package
         run: sudo ./build.sh
+
+      - name: Verify ripgrep-linux-x64 is inside app.asar
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          dpkg-deb -x "$GITHUB_WORKSPACE/output/minimax-agent_${VERSION}_amd64.deb" extracted
+          if ! npx --yes @electron/asar list \
+                  "extracted/opt/minimax-agent/resources/app.asar" \
+                  | grep -q '^/node_modules/@vscode/ripgrep-linux-x64/'; then
+            echo "::error::@vscode/ripgrep-linux-x64 is missing from app.asar in the built .deb"
+            echo "This indicates build.sh did not inject the platform package. The .deb will crash on launch with 'Could not find @vscode/ripgrep-linux-x64'."
+            exit 1
+          fi
 
       - name: Verify package
         run: |

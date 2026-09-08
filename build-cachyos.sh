@@ -189,16 +189,34 @@ run_makepkg() {
 
 if [ "${USE_DOCKER}" -eq 1 ]; then
     log "Building inside Docker (archlinux:latest)..."
-    DOCKER_SRCDEST="$(mktemp -d)"
+    if [ -n "${SRCDEST_OVERRIDE:-}" ] && [ -d "${SRCDEST_OVERRIDE}" ]; then
+        DOCKER_SRCDEST="${SRCDEST_OVERRIDE}"
+        log "Using pre-staged SRCDEST: ${DOCKER_SRCDEST}"
+        # Ensure tarball is present in overridden SRCDEST
+        cp -n "${TARBALL}" "${DOCKER_SRCDEST}/" 2>/dev/null || cp "${TARBALL}" "${DOCKER_SRCDEST}/"
+    else
+        DOCKER_SRCDEST="$(mktemp -d)"
+        cp "${TARBALL}" "${DOCKER_SRCDEST}/"
+    fi
     DOCKER_PKGDEST="$(mktemp -d)"
-    trap 'rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}" 2>/dev/null || sudo rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}" 2>/dev/null || true' EXIT
+    trap 'rm -rf "${DOCKER_PKGDEST}" 2>/dev/null || sudo rm -rf "${DOCKER_PKGDEST}" 2>/dev/null || true' EXIT
+    # Only clean up DOCKER_SRCDEST if we created it
+    if [ -z "${SRCDEST_OVERRIDE:-}" ]; then
+        trap 'rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}" 2>/dev/null || sudo rm -rf "${DOCKER_SRCDEST}" "${DOCKER_PKGDEST}" 2>/dev/null || true' EXIT
+    fi
 
     # Stage: copy project + tarball into a build dir the container can see
     DOCKER_WORK="$(mktemp -d)"
     trap 'rm -rf "${DOCKER_WORK}" 2>/dev/null || sudo rm -rf "${DOCKER_WORK}" 2>/dev/null || true' EXIT
     cp -a "${SCRIPT_DIR}/cachyos" "${DOCKER_WORK}/"
     cp "${TARBALL}" "${DOCKER_WORK}/"
-    cp "${TARBALL}" "${DOCKER_SRCDEST}/"
+    if [ -z "${SRCDEST_OVERRIDE:-}" ]; then
+        cp "${TARBALL}" "${DOCKER_SRCDEST}/"
+    fi
+    # Also copy any pre-staged .deb from SRCDEST_OVERRIDE
+    if [ -n "${SRCDEST_OVERRIDE:-}" ] && [ -f "${SRCDEST_OVERRIDE}/minimax-agent_${PKGVER}_amd64.deb" ]; then
+        log "Pre-staged .deb found in SRCDEST, will be used offline"
+    fi
 
     docker run --rm \
         -v "${DOCKER_WORK}:/work" \
@@ -229,10 +247,19 @@ else
     fi
 
     # Run makepkg from the cachyos/ dir, with our tarball cached
-    SRCDEST_STAGE="$(mktemp -d)"
+    if [ -n "${SRCDEST_OVERRIDE:-}" ] && [ -d "${SRCDEST_OVERRIDE}" ]; then
+        SRCDEST_STAGE="${SRCDEST_OVERRIDE}"
+        log "Using pre-staged SRCDEST: ${SRCDEST_STAGE}"
+        cp -n "${TARBALL}" "${SRCDEST_STAGE}/" 2>/dev/null || true
+    else
+        SRCDEST_STAGE="$(mktemp -d)"
+        cp "${TARBALL}" "${SRCDEST_STAGE}/"
+    fi
     PKGDEST_STAGE="$(mktemp -d)"
-    trap 'rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}" 2>/dev/null || sudo rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}" 2>/dev/null || true' EXIT
-    cp "${TARBALL}" "${SRCDEST_STAGE}/"
+    trap 'rm -rf "${PKGDEST_STAGE}" 2>/dev/null || sudo rm -rf "${PKGDEST_STAGE}" 2>/dev/null || true' EXIT
+    if [ -z "${SRCDEST_OVERRIDE:-}" ]; then
+        trap 'rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}" 2>/dev/null || sudo rm -rf "${SRCDEST_STAGE}" "${PKGDEST_STAGE}" 2>/dev/null || true' EXIT
+    fi
 
     ( cd "${PKG_DIR}" && \
       SRCDEST="${SRCDEST_STAGE}" \

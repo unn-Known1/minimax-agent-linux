@@ -180,6 +180,8 @@ jobs:
           # Update the source URL in .SRCINFO
           sed -i "s|minimax-agent-linux-[0-9.]\+\.tar\.gz|minimax-agent-linux-${VERSION}.tar.gz|g" cachyos/.SRCINFO
           sed -i "s|https://github.com/unn-Known1/minimax-agent-linux/archive/refs/tags/v[0-9.]\+\.tar\.gz|https://github.com/unn-Known1/minimax-agent-linux/archive/refs/tags/v${VERSION}.tar.gz|g" cachyos/.SRCINFO
+          sed -i "s|minimax-agent_[0-9.]\+_amd64\.deb|minimax-agent_${VERSION}_amd64.deb|g" cachyos/.SRCINFO
+          sed -i "s|releases/download/v[0-9.]\+/|releases/download/v${VERSION}/|g" cachyos/.SRCINFO
 
       - name: Copy resources from Windows release
         run: |
@@ -257,8 +259,8 @@ jobs:
   # ─────────────────── Cachy OS / Arch build (new) ───────────────────
   build-cachyos:
     name: Build Cachy OS / Arch Package
-    needs: check-release
-    if: needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [check-release, build-deb]
+    if: always() && (needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch') && needs.build-deb.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -335,6 +337,35 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           sed -i "s/^pkgver=.*/pkgver=${VERSION}/" cachyos/PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" cachyos/PKGBUILD
+          # Also update .SRCINFO deb URL (was missing, caused stale 3.0.68 ref)
+          sed -i "s|minimax-agent_[0-9.]\+_amd64\.deb|minimax-agent_${VERSION}_amd64.deb|g" cachyos/.SRCINFO
+          sed -i "s|releases/download/v[0-9.]\+/|releases/download/v${VERSION}/|g" cachyos/.SRCINFO
+
+      - name: Fetch .deb artifact from build-deb (for PKGBUILD SRCDEST)
+        uses: actions/download-artifact@v4
+        with:
+          name: minimax-agent-deb
+          path: /tmp/cachyos-deb
+        continue-on-error: true
+
+      - name: Stage .deb for PKGBUILD offline build
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ -f "/tmp/cachyos-deb/minimax-agent_${VERSION}_amd64.deb" ]; then
+            echo "Found .deb artifact, staging for offline makepkg..."
+            mkdir -p /tmp/cachyos-srcdest
+            cp "/tmp/cachyos-deb/minimax-agent_${VERSION}_amd64.deb" "/tmp/cachyos-srcdest/"
+            # Also stage tarball location for build-cachyos.sh to reuse
+            ls -la /tmp/cachyos-srcdest/
+          else
+            echo "No .deb artifact found (build-deb may have failed) — will build without .deb, PKGBUILD prepare() will skip extraction"
+            # Create dummy placeholder so makepkg doesn't attempt network download and fail with 404
+            # makepkg checks SRCDEST first; if file exists it won't curl
+            mkdir -p /tmp/cachyos-srcdest
+            # Leave empty — prepare() handles missing .deb gracefully
+          fi
+          # Export for build-cachyos.sh via env file
+          echo "SRCDEST_OVERRIDE=/tmp/cachyos-srcdest" >> $GITHUB_ENV
 
       - name: Build Cachy OS package (Docker archlinux)
         run: |
@@ -371,7 +402,7 @@ jobs:
   # ──────────────────────── Combined release ────────────────────────
   release:
     name: Create GitHub Release with .deb + .pkg.tar.zst
-    needs: [build-deb, build-cachyos]
+    needs: [check-release, build-deb, build-cachyos]
     if: always() && (needs.build-deb.result == 'success' || needs.build-cachyos.result == 'success') && (needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
@@ -452,7 +483,7 @@ jobs:
 
   notify-failure:
     name: Create Failure Issue
-    needs: [build-deb, build-cachyos]
+    needs: [check-release, build-deb, build-cachyos]
     if: failure() && (needs.check-release.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:

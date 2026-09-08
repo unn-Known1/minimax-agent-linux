@@ -98,7 +98,7 @@ Same package as Cachy OS (`minimax-agent-<version>-1-x86_64.pkg.tar.zst`). The i
 This package is .deb based. For RPM-based systems, you would need to convert it using `alien`:
 ```bash
 sudo dnf install alien
-sudo alien -r minimax-agent_3.0.68_amd64.deb
+sudo alien -r minimax-agent_3.0.69_amd64.deb
 ```
 
 A proper `.spec` file for Fedora would be a great contribution — open a PR.

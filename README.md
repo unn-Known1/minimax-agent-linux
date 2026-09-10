@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux-blue" alt="Platform">
   <img src="https://img.shields.io/badge/Architecture-amd64-orange" alt="Architecture">
-  <img src="https://img.shields.io/badge/Version-3.0.69-green" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.0.70-green" alt="Version">
   <img src="https://img.shields.io/badge/Packages-deb%20%7C%20pkg--tar--zst-red" alt="Packages">
 </p>
 
@@ -18,8 +18,8 @@ Pick your distribution:
 ### Debian / Ubuntu / Linux Mint (.deb)
 
 ```bash
-wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.69/minimax-agent_3.0.69_amd64.deb
-sudo dpkg -i minimax-agent_3.0.69_amd64.deb
+wget https://github.com/unn-Known1/minimax-agent-linux/releases/download/v3.0.70/minimax-agent_3.0.70_amd64.deb
+sudo dpkg -i minimax-agent_3.0.70_amd64.deb
 sudo apt --fix-broken install
 sudo ./setup.sh
 minimax-agent

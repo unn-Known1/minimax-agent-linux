@@ -19,7 +19,7 @@
 # skipped the optional-dependency install.
 
 pkgname=minimax-agent
-pkgver=3.0.70
+pkgver=3.0.72
 pkgrel=1
 pkgdesc="Unofficial Linux port of MiniMax Agent — AI-powered code assistant (Electron desktop app)"
 arch=('x86_64')

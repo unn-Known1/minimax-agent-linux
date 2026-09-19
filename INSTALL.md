@@ -182,7 +182,7 @@ sudo apt install wget curl unzip libgtk-3-0 libnss3 libasound2 libxss1 libgbm1 n
 #### Step 1 — Install the .deb Package
 
 ```bash
-sudo dpkg -i minimax-agent_3.0.72_amd64.deb
+sudo dpkg -i minimax-agent_3.0.73_amd64.deb
 sudo apt --fix-broken install
 ```
 
@@ -264,7 +264,7 @@ This project targets Debian and Arch. For Fedora, convert the .deb via `alien`:
 
 ```bash
 sudo dnf install alien
-sudo alien -r minimax-agent_3.0.72_amd64.deb
+sudo alien -r minimax-agent_3.0.73_amd64.deb
 sudo dnf install ./minimax-agent-3.0.68.x86_64.rpm
 ```
 

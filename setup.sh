@@ -4,7 +4,7 @@
 
 set -e
 
-VERSION="3.0.72"
+VERSION="3.0.73"
 ELECTRON_VERSION="35.7.0"
 ELECTRON_URL="https://github.com/electron/electron/releases/download/v${ELECTRON_VERSION}/electron-v${ELECTRON_VERSION}-linux-x64.zip"
 

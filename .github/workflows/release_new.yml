@@ -49,18 +49,28 @@ jobs:
           # Parse current version
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
 
-          # Check next 20 patch versions
+          # Floor: 3.0.x line is dead, don't waste HEAD requests on it.
+          FLOOR_VERSION="3.1.0"
+
+          is_below_floor() {
+            # Returns 0 (true) if $1 < FLOOR_VERSION
+            [ "$1" = "$FLOOR_VERSION" ] && return 1
+            SMALLEST=$(printf '%s\n%s\n' "$1" "$FLOOR_VERSION" | sort -V | head -n1)
+            [ "$SMALLEST" = "$1" ]
+          }
+
           LATEST_VERSION=""
           LATEST_URL=""
 
-          for i in $(seq 1 20); do
-            TEST_PATCH=$((PATCH + i))
-            TEST_VERSION="${MAJOR}.${MINOR}.${TEST_PATCH}"
+          check_candidate() {
+            TEST_VERSION="$1"
+            if is_below_floor "$TEST_VERSION"; then
+              echo "Skipping $TEST_VERSION (older than floor $FLOOR_VERSION)..."
+              return
+            fi
             TEST_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${TEST_VERSION}.exe"
-
             echo "Checking $TEST_VERSION..."
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --head "$TEST_URL" --max-time 10 || echo "000")
-
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Found new version: $TEST_VERSION"
               LATEST_VERSION=$TEST_VERSION
@@ -70,7 +80,56 @@ jobs:
             else
               echo "Version $TEST_VERSION check failed (HTTP $HTTP_CODE)"
             fi
+          }
+
+          # 1. Next 20 patch versions in current minor (e.g. 3.0.75-3.0.94)
+          for i in $(seq 1 20); do
+            check_candidate "${MAJOR}.${MINOR}.$((PATCH + i))"
           done
+
+          # 2. Next 5 minor versions (e.g. 3.1.0-3.5.0) — catches 3.0.x -> 3.1.0
+          for m in $(seq 1 5); do
+            check_candidate "${MAJOR}.$((MINOR + m)).0"
+          done
+
+          # 3. Next major version (e.g. 4.0.0) — catches 3.x -> 4.0.0
+          check_candidate "$((MAJOR + 1)).0.0"
+
+          # 4. Refine: if we jumped to a new minor/major, find the newest
+          # patch + newer minors inside that new line (e.g. 3.1.0 -> 3.1.5,
+          # 4.0.0 -> 4.0.2 or 4.1.0). Probes in increasing order so
+          # LATEST_VERSION always ends up as the highest found.
+          if [ -n "$LATEST_VERSION" ]; then
+            IFS='.' read -r L_MAJOR L_MINOR L_PATCH <<< "$LATEST_VERSION"
+            # Newer patches in the latest minor line
+            for i in $(seq 1 20); do
+              # Skip versions already checked in phase 1
+              if [ "$L_MAJOR" = "$MAJOR" ] && [ "$L_MINOR" = "$MINOR" ] && [ $((L_PATCH + i)) -le $((PATCH + 20)) ]; then
+                continue
+              fi
+              check_candidate "${L_MAJOR}.${L_MINOR}.$((L_PATCH + i))"
+            done
+            # Re-parse (patch loop may have advanced L_PATCH) then check
+            # newer minors in the latest major line
+            IFS='.' read -r L_MAJOR L_MINOR L_PATCH <<< "$LATEST_VERSION"
+            PRE_MINOR_LINE="${L_MAJOR}.${L_MINOR}"
+            for m in $(seq 1 5); do
+              # Skip minors already checked in phase 2
+              if [ "$L_MAJOR" = "$MAJOR" ] && [ $((L_MINOR + m)) -le $((MINOR + 5)) ]; then
+                continue
+              fi
+              check_candidate "${L_MAJOR}.$((L_MINOR + m)).0"
+            done
+            # Final patch sweep only if the minor line advanced above
+            # (e.g. 4.0.x -> 4.1.0 needs its 4.1.x patches probed).
+            # Otherwise we'd just re-check the same 20 patches from above.
+            IFS='.' read -r L_MAJOR L_MINOR L_PATCH <<< "$LATEST_VERSION"
+            if [ "${L_MAJOR}.${L_MINOR}" != "$PRE_MINOR_LINE" ]; then
+              for i in $(seq 1 20); do
+                check_candidate "${L_MAJOR}.${L_MINOR}.$((L_PATCH + i))"
+              done
+            fi
+          fi
 
           if [ -n "$LATEST_VERSION" ]; then
             echo "New version detected: $LATEST_VERSION"

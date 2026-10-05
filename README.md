@@ -13,6 +13,16 @@
 
 ## Quick Install
 
+### With an AI agent (opencode / Claude Code / Codex)
+
+Paste this into your agent:
+
+```
+Install the latest MiniMax Agent Linux release from https://github.com/unn-Known1/minimax-agent-linux — match the package type to my distro (.deb vs .pkg.tar.zst).
+```
+
+### Manually
+
 Pick your distribution:
 
 ### Debian / Ubuntu / Linux Mint (.deb)

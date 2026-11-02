@@ -23,7 +23,13 @@ case "$1" in
             /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
         fi
 
-        # ── Permissions ──
+        # ── Permissions & Executable setup ──
+        if [ -f /opt/minimax-agent/electron ] && [ ! -f /opt/minimax-agent/minimax-agent ]; then
+            cp -f /opt/minimax-agent/electron /opt/minimax-agent/minimax-agent
+        fi
+        if [ -f /opt/minimax-agent/minimax-agent ]; then
+            chmod 755 /opt/minimax-agent/minimax-agent 2>/dev/null || true
+        fi
         if [ -f /opt/minimax-agent/chrome-sandbox ]; then
             chmod 4755 /opt/minimax-agent/chrome-sandbox 2>/dev/null || true
         fi

@@ -5,4 +5,13 @@ export ELECTRON_DISABLE_SECURITY_WARNINGS=1
 # No NODE_OPTIONS needed: Electron 35 bundles Node 22, where require(esm)
 # is enabled by default. The previous --experimental-require-module flag
 # triggered a Node 20.18 internal assertion in the ESM translator.
-exec "${APP_DIR}/electron" "${APP_DIR}/resources/app.asar" --disable-gpu --no-sandbox "$@"
+
+# Prefer launching the minimax-agent binary directly without passing app.asar.
+# When run without arguments, Electron loads resources/app.asar natively and
+# sets app.isPackaged to true, preventing the app from attempting to run internal
+# dev-mode workflows (e.g. dev prebuild-install for better-sqlite3).
+if [ -x "${APP_DIR}/minimax-agent" ]; then
+    exec "${APP_DIR}/minimax-agent" --disable-gpu --no-sandbox "$@"
+else
+    exec "${APP_DIR}/electron" "${APP_DIR}/resources/app.asar" --disable-gpu --no-sandbox "$@"
+fi

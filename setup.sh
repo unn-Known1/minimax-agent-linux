@@ -73,6 +73,11 @@ echo ""
 echo "[3/7] Extracting Electron..."
 cd /opt/minimax-agent
 unzip -o /var/cache/minimax-agent/electron.zip
+# Remove stock default_app.asar so Electron loads app.asar by default
+rm -f /opt/minimax-agent/resources/default_app.asar
+# Provide binary named minimax-agent so app.isPackaged evaluates to true
+cp -f /opt/minimax-agent/electron /opt/minimax-agent/minimax-agent
+chmod 755 /opt/minimax-agent/minimax-agent
 echo "  Extraction complete."
 
 # Install daemon npm dependencies
@@ -90,7 +95,7 @@ fi
 # Set permissions
 echo ""
 echo "[5/7] Setting permissions..."
-chmod 755 /opt/minimax-agent/electron
+chmod 755 /opt/minimax-agent/electron /opt/minimax-agent/minimax-agent 2>/dev/null || true
 chmod 4755 /opt/minimax-agent/chrome-sandbox 2>/dev/null || true
 chmod 755 /opt/minimax-agent/resources/resources/opencode 2>/dev/null || true
 echo "  Permissions set."

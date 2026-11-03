@@ -324,6 +324,30 @@ else
     # as unpacked entries in the new asar (which would break the next extract).
     find "$TMPDIR/extracted" -type f -size 0 -delete 2>/dev/null || true
 
+    # Patch wechat-sdk-wire.js: utilityProcess does not have access to 'electron'
+    # module, causing top-level require("electron") to throw MODULE_NOT_FOUND and
+    # crash the utility runtime during handshake ("service failed to start").
+    WECHAT_WIRE="$TMPDIR/extracted/dist/main/modules/local-runtime/wechat-sdk-wire.js"
+    if [ -f "$WECHAT_WIRE" ]; then
+        echo "  Patching wechat-sdk-wire.js for utilityProcess..."
+        sed -i 's/const electron_1 = require("electron");/const electron_1 = (() => { try { return require("electron"); } catch { return { net: { fetch: (typeof fetch !== "undefined" ? fetch : undefined) } }; } })();/g' "$WECHAT_WIRE"
+    fi
+
+    # Patch dist/main/index.js: guarantee app.isPackaged is true in Linux wrappers
+    # so runtime services do not attempt internal dev-mode workflows.
+    MAIN_INDEX="$TMPDIR/extracted/dist/main/index.js"
+    if [ -f "$MAIN_INDEX" ]; then
+        echo "  Patching app.isPackaged in main/index.js..."
+        sed -i '/const electron_1 = require("electron");/a try { Object.defineProperty(electron_1.app, "isPackaged", { get: () => true }); } catch (e) {}' "$MAIN_INDEX"
+    fi
+
+    # Patch native-sqlite-env.js: avoid attempting dev prebuild-install in Linux wrappers
+    SQLITE_ENV="$TMPDIR/extracted/dist/main/modules/local-runtime/native-sqlite-env.js"
+    if [ -f "$SQLITE_ENV" ]; then
+        echo "  Patching native-sqlite-env.js..."
+        sed -i 's/if (electronApp.isPackaged === false)/if (false)/g' "$SQLITE_ENV"
+    fi
+
     # Repack with the same unpacked patterns electron-builder uses by default.
     TOOLS=$(mktemp -d /tmp/asar-tools-XXXXXX)
     ( cd "$TOOLS" && npm init -y >/dev/null 2>&1 && npm install --no-audit --no-fund @electron/asar 2>&1 | tail -2 )

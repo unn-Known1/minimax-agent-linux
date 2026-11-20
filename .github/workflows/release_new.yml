@@ -188,7 +188,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXE_URL="${{ github.event.inputs.exe_url }}"
             if [ -z "$EXE_URL" ]; then
-              EXE_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${VERSION}.exe"
+              EXE_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${VERSION}-x64.exe"
             fi
           else
             EXE_URL="${{ needs.check-release.outputs.exe_url }}"
@@ -346,7 +346,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p /tmp/minimax-extract
           cd /tmp/minimax-extract
-          EXE_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${VERSION}.exe"
+          EXE_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${VERSION}-x64.exe"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.exe_url }}" ]; then
             EXE_URL="${{ github.event.inputs.exe_url }}"
           fi

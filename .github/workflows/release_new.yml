@@ -68,7 +68,7 @@ jobs:
               echo "Skipping $TEST_VERSION (older than floor $FLOOR_VERSION)..."
               return
             fi
-            TEST_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${TEST_VERSION}.exe"
+            TEST_URL="https://file.cdn.minimax.io/public/minimax-agent-prod/release/MiniMax%20Code%20Setup%20${TEST_VERSION}-x64.exe"
             echo "Checking $TEST_VERSION..."
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --head "$TEST_URL" --max-time 10 || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then

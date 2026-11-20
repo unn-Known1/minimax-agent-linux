@@ -4,7 +4,7 @@
 
 set -e
 
-VERSION="3.1.14"
+VERSION="3.1.16"
 ARCH="amd64"
 # Must match setup.sh's ELECTRON_VERSION. Used for @electron/rebuild.
 ELECTRON_VERSION="35.7.0"
